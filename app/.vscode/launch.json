@@ -1,0 +1,15 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Berkah POS (Android)",
+      "request": "launch",
+      "type": "dart",
+      "program": "lib/main.dart",
+      "args": [
+        "--dart-define=SUPABASE_URL=https://xyz.supabase.co",
+        "--dart-define=SUPABASE_ANON_KEY=eyJhbGciOi..."
+      ]
+    }
+  ]
+}
