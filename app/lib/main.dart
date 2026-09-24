@@ -7,6 +7,9 @@ import 'screens/splash.dart';
 import 'screens/register.dart';
 import 'screens/toko_setup.dart';
 import 'screens/kasir_setup.dart';
+import 'screens/produk_form.dart';
+import 'screens/riwayat.dart';
+import 'screens/lainnya.dart';
 import 'screens/login.dart';
 import 'screens/pin.dart';
 import 'screens/shift.dart';
@@ -63,6 +66,9 @@ class BerkahPos extends StatelessWidget {
         '/tunai': (_) => const BayarTunaiScreen(),
         '/qris': (_) => const BayarQrisScreen(),
         '/sukses': (_) => const SuksesScreen(),
+        '/produk_baru': (_) => const ProdukFormScreen(),
+        '/riwayat': (_) => const RiwayatScreen(),
+        '/lainnya': (_) => const LainnyaScreen(),
       },
     );
   }

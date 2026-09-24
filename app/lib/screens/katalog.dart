@@ -189,10 +189,25 @@ class _K extends ConsumerState<KatalogScreen> {
             ]),
           ),
       ]),
+
+      // Owner: tombol + tambah produk langsung dari katalog.
+      floatingActionButton: session?.isOwner == true
+          ? FloatingActionButton(
+              onPressed: () =>
+                  Navigator.pushNamed(context, '/produk_baru'),
+              child: const Icon(Icons.add),
+            )
+          : null,
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: 0,
         onTap: (i) {
-          if (i == 1) Navigator.pushNamed(context, '/keranjang');
+          if (i == 1) {
+            Navigator.pushNamed(context, '/keranjang');
+          } else if (i == 2) {
+            Navigator.pushNamed(context, '/riwayat');
+          } else if (i == 3) {
+            Navigator.pushNamed(context, '/lainnya');
+          }
         },
         items: const [
           BottomNavigationBarItem(
