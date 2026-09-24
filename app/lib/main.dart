@@ -1,0 +1,52 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'core/theme.dart';
+import 'screens/splash.dart';
+import 'screens/login.dart';
+import 'screens/pin.dart';
+import 'screens/shift.dart';
+import 'screens/katalog.dart';
+import 'screens/detail.dart';
+import 'screens/keranjang.dart';
+import 'screens/pelanggan.dart';
+import 'screens/bayar_tunai.dart';
+import 'screens/bayar_qris.dart';
+import 'screens/sukses.dart';
+
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  const url = String.fromEnvironment('SUPABASE_URL', defaultValue: '');
+  const key = String.fromEnvironment('SUPABASE_ANON_KEY', defaultValue: '');
+  if (url.isNotEmpty && key.isNotEmpty) {
+    // ignore: deprecated_member_use (supabase_flutter 2.x masih pakai anonKey)
+    await Supabase.initialize(url: url, anonKey: key);
+  }
+  runApp(const ProviderScope(child: BerkahPos()));
+}
+
+class BerkahPos extends StatelessWidget {
+  const BerkahPos({super.key});
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      title: 'Berkah POS',
+      theme: appTheme(),
+      debugShowCheckedModeBanner: false,
+      initialRoute: '/splash',
+      routes: {
+        '/splash': (_) => const SplashScreen(),
+        '/login': (_) => const LoginScreen(),
+        '/pin': (_) => const PinScreen(),
+        '/shift': (_) => const ShiftScreen(),
+        '/katalog': (_) => const KatalogScreen(),
+        '/detail': (_) => const DetailScreen(),
+        '/keranjang': (_) => const KeranjangScreen(),
+        '/pelanggan': (_) => const PelangganScreen(),
+        '/tunai': (_) => const BayarTunaiScreen(),
+        '/qris': (_) => const BayarQrisScreen(),
+        '/sukses': (_) => const SuksesScreen(),
+      },
+    );
+  }
+}
