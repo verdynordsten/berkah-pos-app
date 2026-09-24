@@ -3,8 +3,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/store.dart';
 import '../core/theme.dart';
 
-// 03a Setup Toko (owner) — nama/alamat/telp/pajak. Dibuka setelah
-// register & tiap login owner. Simpan -> update stores -> /kasir.
+// 03a Setup Toko (owner) — 2 mode:
+//  A. Punya session (normal): edit nama/alamat/telp/pajak. Simpan -> /kasir.
+//  B. TANPA session tapi auth Supabase ada (login valid, membership belum ada
+//     karena RPC register gagal / akun lama tanpa baris membership):
+//     form BIKIN TOKO BARU langsung dari sini -> RPC (fallback insert manual)
+//     -> /pilih. Jadi tidak ada lagi loop "Sesi habis -> login -> Sesi habis".
 class TokoSetupScreen extends ConsumerStatefulWidget {
   const TokoSetupScreen({super.key});
   @override
@@ -32,17 +36,20 @@ class _T extends ConsumerState<TokoSetupScreen> {
   }
 
   /// Coba pulihkan sesi dari auth Supabase yang tersimpan di device.
-  /// Return true kalau berhasil (navigasi ke /pilih), false kalau memang
-  /// belum login / belum punya toko (tampilkan tombol ke /login).
-  Future<bool> _restore() async {
+  /// Return 'ok' (sesi pulih -> ke /pilih), 'notoko' (auth ADA tapi belum
+  /// punya membership -> perlu bikin toko dulu), atau 'login' (belum login
+  /// sama sekali -> tampilkan tombol ke /login).
+  Future<String> _restore() async {
     try {
-      final s = await restoreOwnerSession(ref.read(supabaseProvider));
-      if (s == null) return false;
+      final db = ref.read(supabaseProvider);
+      if (db.auth.currentUser == null) return 'login';
+      final s = await restoreOwnerSession(db);
+      if (s == null) return 'notoko';
       ref.read(sessionProvider.notifier).set(s);
       if (mounted) Navigator.pushReplacementNamed(context, '/pilih');
-      return true;
+      return 'ok';
     } catch (_) {
-      return false;
+      return 'login';
     }
   }
 
@@ -90,10 +97,14 @@ class _T extends ConsumerState<TokoSetupScreen> {
             return const Scaffold(
                 body: Center(child: CircularProgressIndicator()));
           }
-          if (snap.data == true) {
+          if (snap.data == 'ok') {
             return const Scaffold(
                 body: Center(child: CircularProgressIndicator()));
           }
+          // Auth valid tapi belum punya toko (akun lama tanpa membership /
+          // RPC register gagal): langsung kasih form bikin toko, BUKAN
+          // layar "Sesi habis" yang bikin loop.
+          if (snap.data == 'notoko') return const _BuatTokoForm();
           return Scaffold(
             appBar: AppBar(title: const Text('Setup Toko')),
             body: Center(
@@ -153,6 +164,99 @@ class _T extends ConsumerState<TokoSetupScreen> {
         FilledButton(
             onPressed: _busy ? null : _save,
             child: Text(_busy ? 'Menyimpan...' : 'Simpan & Lanjut')),
+      ]),
+    );
+  }
+}
+
+/// Form bikin toko baru — dipakai kalau auth login VALID tapi membership
+/// toko belum ada (akun lama tanpa baris membership / RPC register gagal).
+/// Isi nama toko + nama owner -> RPC create_store_with_owner (fallback:
+/// insert stores + memberships manual) -> langsung /pilih. Anti-loop.
+class _BuatTokoForm extends ConsumerStatefulWidget {
+  const _BuatTokoForm();
+  @override
+  ConsumerState<_BuatTokoForm> createState() => _BTF();
+}
+
+class _BTF extends ConsumerState<_BuatTokoForm> {
+  final _store = TextEditingController();
+  final _name = TextEditingController(text: 'Owner');
+  bool _busy = false;
+  String? _err;
+
+  Future<void> _go() async {
+    final store = _store.text.trim();
+    final name = _name.text.trim().isEmpty ? 'Owner' : _name.text.trim();
+    if (store.isEmpty) {
+      setState(() => _err = 'Isi nama toko dulu.');
+      return;
+    }
+    setState(() { _busy = true; _err = null; });
+    try {
+      final db = ref.read(supabaseProvider);
+      final u = db.auth.currentUser;
+      if (u == null) throw StateError('Sesi login hilang. Masuk lagi.');
+      String sid;
+      try {
+        sid = await db.rpc('create_store_with_owner', params: {
+          'p_user_id': u.id,
+          'p_store_name': store,
+          'p_display_name': name,
+        }) as String;
+      } catch (_) {
+        // RPC belum ada / gagal (DB lama): bikin manual 2 langkah.
+        final srow = await db.from('stores').insert({'name': store})
+            .select('id').single();
+        sid = srow['id'] as String;
+        await db.from('memberships').upsert({
+          'store_id': sid, 'user_id': u.id,
+          'role': 'owner', 'display_name': name, 'is_active': true,
+        }, onConflict: 'store_id,user_id');
+      }
+      ref.read(sessionProvider.notifier).set(PosSession(
+        kind: LoginKind.owner, storeId: sid, storeName: store,
+        actorId: u.id, displayName: name, role: 'owner'));
+      if (mounted) Navigator.pushReplacementNamed(context, '/pilih');
+    } catch (e) {
+      if (mounted) setState(() { _err = '$e'; _busy = false; });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('Buat Toko')),
+      body: ListView(padding: const EdgeInsets.all(16), children: [
+        const Text('Login berhasil, tapi akun ini belum punya toko.',
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+        const SizedBox(height: 4),
+        const Text('Isi sekali aja — langsung masuk Pilih Pengguna.',
+            style: TextStyle(color: AppColors.mfg)),
+        const SizedBox(height: 16),
+        const Text('Nama toko',
+            style: TextStyle(fontWeight: FontWeight.w600)),
+        const SizedBox(height: 6),
+        TextField(controller: _store,
+            decoration: const InputDecoration(
+                hintText: 'cth: Berkah Coffee',
+                border: OutlineInputBorder())),
+        const SizedBox(height: 12),
+        const Text('Nama owner',
+            style: TextStyle(fontWeight: FontWeight.w600)),
+        const SizedBox(height: 6),
+        TextField(controller: _name,
+            decoration: const InputDecoration(
+                hintText: 'cth: Verdy',
+                border: OutlineInputBorder())),
+        if (_err != null) ...[
+          const SizedBox(height: 8),
+          Text(_err!, style: const TextStyle(color: Colors.red)),
+        ],
+        const SizedBox(height: 16),
+        FilledButton(
+            onPressed: _busy ? null : _go,
+            child: Text(_busy ? 'Membuat...' : 'Buat Toko & Masuk')),
       ]),
     );
   }

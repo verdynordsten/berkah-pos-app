@@ -37,8 +37,9 @@ class _L extends ConsumerState<LoginScreen> {
       final mem = await db.from('memberships').select().eq('user_id', uid)
           .eq('is_active', true).order('created_at').limit(1).maybeSingle();
       if (mem == null) {
-        // User auth ada tapi belum punya toko (mis. RPC gagal di register)
-        // -> arahkan bikin toko.
+        // Auth valid tapi belum punya membership (akun lama tanpa baris
+        // membership / RPC register gagal). JANGAN balik ke /login (itu
+        // loop) — ke /toko_baru yang langsung kasih form Buat Toko.
         if (mounted) Navigator.pushReplacementNamed(context, '/toko_baru');
         return;
       }
