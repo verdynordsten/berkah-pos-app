@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/store.dart';
+import '../core/last_session.dart';
 import '../core/theme.dart';
 import '../core/loading.dart';
 
@@ -165,6 +166,12 @@ class _Sh extends ConsumerState<ShiftScreen> {
       }).select().single();
       ref.read(shiftProvider.notifier).state =
           (row as Map).cast<String, dynamic>();
+      // Ingat shift aktif di device (tahan app ke-kill).
+      try {
+        final m = row as Map;
+        await LastSession.saveShift(
+            (m['id'] ?? '').toString(), pick);
+      } catch (_) {}
       if (mounted) Navigator.pushReplacementNamed(context, '/katalog');
     } catch (e) {
       setState(() => err = '$e');

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/store.dart';
+import '../core/last_session.dart';
 import '../core/theme.dart';
 import 'kasir_setup.dart' show hashPin, hashOwnerPin;
 
@@ -119,6 +120,7 @@ class _PU extends ConsumerState<PilihUserScreen> {
                     // Ganti operator = keranjang + shift lama dibersihkan.
                     ref.read(cartProvider.notifier).clear();
                     ref.read(shiftProvider.notifier).state = null;
+                    await LastSession.clearShift();
                     if (ctx.mounted) Navigator.pop(ctx, true);
                   } catch (e) {
                     setD(() => err = '$e');
@@ -321,6 +323,7 @@ class _PU extends ConsumerState<PilihUserScreen> {
         role: (mem['role'] as String?) ?? 'owner'));
       ref.read(cartProvider.notifier).clear();
       ref.read(shiftProvider.notifier).state = null;
+      await LastSession.clearShift();
       if (mounted) Navigator.pushReplacementNamed(context, '/shift');
     } catch (_) {}
   }
@@ -369,6 +372,7 @@ class _PU extends ConsumerState<PilihUserScreen> {
               await ref.read(supabaseProvider).auth.signOut();
               ref.read(sessionProvider.notifier).clear();
               ref.read(shiftProvider.notifier).state = null;
+              await LastSession.clearAll();
               if (context.mounted) {
                 Navigator.pushNamedAndRemoveUntil(
                     context, '/login', (_) => false);

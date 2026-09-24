@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'last_session.dart';
 
 final supabaseProvider = Provider<SupabaseClient>((ref) {
   return Supabase.instance.client;
@@ -96,6 +97,9 @@ class SessionCtl extends StateNotifier<PosSession?> {
     _ref.read(cartProvider.notifier).clear();
     _ref.read(customerProvider.notifier).state = null;
     state = s;
+    // Ingat posisi terakhir di device (tahan app ke-kill).
+    // Fire-and-forget: jangan tahan UI kalau storage lambat.
+    LastSession.saveSpot(s);
   }
 
   void clear() {

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/store.dart';
+import '../core/last_session.dart';
 import '../core/theme.dart';
 import '../core/bottom_nav.dart';
 
@@ -218,6 +219,7 @@ class LainnyaScreen extends ConsumerWidget {
         'closed_at': DateTime.now().toIso8601String(),
       }).eq('id', sh['id'] as String);
       ref.read(shiftProvider.notifier).state = null;
+      await LastSession.clearShift();
       if (context.mounted) {
         // Kill-switch: buang SEMUA layar jualan, balik ke shift.
         // Back dari shift = keluar app (tidak bisa nyasar ke katalog
@@ -249,6 +251,7 @@ class LainnyaScreen extends ConsumerWidget {
     await ref.read(supabaseProvider).auth.signOut();
     ref.read(sessionProvider.notifier).clear();
     ref.read(shiftProvider.notifier).state = null;
+    await LastSession.clearAll();
     if (context.mounted) {
       Navigator.pushNamedAndRemoveUntil(
           context, '/login', (_) => false);

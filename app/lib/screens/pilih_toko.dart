@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/store.dart';
+import '../core/last_session.dart';
 import '../core/loading.dart';
 
 // F6/Gap5c — Pilih Toko: 1 akun bisa punya BANYAK toko (outlet).
@@ -76,6 +77,7 @@ class _PT extends ConsumerState<PilihTokoScreen> {
             onPressed: () async {
               await ref.read(supabaseProvider).auth.signOut();
               ref.read(sessionProvider.notifier).clear();
+              await LastSession.clearAll();
               if (context.mounted) {
                 Navigator.pushNamedAndRemoveUntil(
                     context, '/login', (_) => false);
