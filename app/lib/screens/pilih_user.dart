@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/store.dart';
 import '../core/theme.dart';
-import 'kasir_setup.dart' show hashPin;
+import 'kasir_setup.dart' show hashPin, hashOwnerPin;
 import 'shift.dart' show shiftProvider;
 
 // 02b Pilih Pengguna — setelah login owner/admin (email), pilih mau
@@ -134,42 +134,195 @@ class _PU extends ConsumerState<PilihUserScreen> {
     }
   }
 
-  /// Masuk sebagai owner (sudah auth email, tanpa PIN lagi).
+  /// Masuk sebagai owner — WAJIB PIN owner (bukan tanpa PIN).
+  /// Kasir yang pegang HP tidak bisa naik ke owner tanpa tahu PIN ini.
+  /// Kalau owner belum pernah pasang PIN (pin_hash NULL = akun lama),
+  /// langsung diminta BUAT PIN dulu, sekali aja.
   void _asOwner() {
     final s = ref.read(sessionProvider);
     if (s == null) return;
-    // Kalau sesi sekarang staff (hasil switch), auth owner mungkin masih ada.
-    // Kembalikan ke owner via membership tersimpan? Paling aman: kalau auth
-    // Supabase masih login, rebuild owner session dari memberships.
-    _restoreOwner(s.storeId);
+    _ownerPinFlow(s.storeId);
   }
 
-  Future<void> _restoreOwner(String storeId) async {
+  Future<void> _ownerPinFlow(String storeId) async {
+    final db = ref.read(supabaseProvider);
+    final u = db.auth.currentUser;
+    if (u == null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content: Text('Sesi login email habis. Masuk ulang dulu.')));
+      }
+      return;
+    }
+    // Cek apakah owner sudah punya PIN (baca kolom pin_hash saja).
+    bool hasPin = false;
+    String ownerName = 'Owner';
     try {
-      final db = ref.read(supabaseProvider);
-      final u = db.auth.currentUser;
-      if (u != null) {
-        final mem = await db.from('memberships').select()
-            .eq('user_id', u.id).eq('store_id', storeId)
-            .eq('is_active', true).maybeSingle();
-        if (mem != null) {
-          final store = await db.from('stores').select()
-              .eq('id', storeId).maybeSingle();
-          ref.read(sessionProvider.notifier).set(PosSession(
-            kind: LoginKind.owner, storeId: storeId,
-            storeName: (store?['name'] as String?) ?? 'Toko',
-            actorId: u.id,
-            displayName: (mem['display_name'] as String?) ?? 'Owner',
-            role: (mem['role'] as String?) ?? 'owner'));
-          ref.read(cartProvider.notifier).clear();
-          ref.read(shiftProvider.notifier).state = null;
-          if (mounted) Navigator.pushReplacementNamed(context, '/shift');
-          return;
-        }
+      final mem = await db.from('memberships').select('display_name, pin_hash')
+          .eq('user_id', u.id).eq('store_id', storeId)
+          .eq('is_active', true).maybeSingle();
+      if (mem != null) {
+        ownerName = (mem['display_name'] as String?) ?? 'Owner';
+        hasPin = (mem['pin_hash'] as String?)?.isNotEmpty == true;
       }
     } catch (_) {}
-    // Fallback: sesi sekarang sudah owner-ish -> langsung lanjut.
-    if (mounted) Navigator.pushReplacementNamed(context, '/shift');
+    if (!mounted) return;
+    if (!hasPin) {
+      await _buatPinOwner(storeId, u.id, ownerName);
+      return;
+    }
+    await _mintaPinOwner(storeId, u.id, ownerName);
+  }
+
+  /// Owner belum punya PIN (akun lama) -> buat sekali, langsung masuk.
+  Future<void> _buatPinOwner(
+      String storeId, String uid, String ownerName) async {
+    final pinCtl = TextEditingController();
+    final pin2Ctl = TextEditingController();
+    String? err;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setD) => AlertDialog(
+          title: const Text('Buat PIN Owner'),
+          content: Column(mainAxisSize: MainAxisSize.min, children: [
+            const Text(
+                'Mulai sekarang masuk mode Owner wajib PIN 6 digit. Buat sekali aja.',
+                style: TextStyle(color: AppColors.mfg)),
+            const SizedBox(height: 12),
+            TextField(controller: pinCtl, obscureText: true,
+                keyboardType: TextInputType.number, maxLength: 6,
+                autofocus: true,
+                decoration: const InputDecoration(
+                    labelText: 'PIN 6 digit baru',
+                    border: OutlineInputBorder())),
+            const SizedBox(height: 12),
+            TextField(controller: pin2Ctl, obscureText: true,
+                keyboardType: TextInputType.number, maxLength: 6,
+                decoration: const InputDecoration(
+                    labelText: 'Ulangi PIN',
+                    border: OutlineInputBorder())),
+            if (err != null) ...[
+              const SizedBox(height: 8),
+              Text(err!, style: const TextStyle(color: Colors.red)),
+            ],
+          ]),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx, false),
+                child: const Text('Nanti')),
+            FilledButton(
+                onPressed: () async {
+                  final p1 = pinCtl.text.trim();
+                  final p2 = pin2Ctl.text.trim();
+                  if (p1.length != 6 || int.tryParse(p1) == null) {
+                    setD(() => err = 'PIN harus 6 digit angka.');
+                    return;
+                  }
+                  if (p1 != p2) {
+                    setD(() => err = 'PIN tidak sama. Ulangi.');
+                    return;
+                  }
+                  try {
+                    final db = ref.read(supabaseProvider);
+                    await db.from('memberships').update({
+                      'pin_hash': hashOwnerPin(storeId, uid, p1),
+                    }).eq('user_id', uid).eq('store_id', storeId);
+                    if (ctx.mounted) Navigator.pop(ctx, true);
+                  } catch (e) {
+                    setD(() => err = '$e');
+                  }
+                },
+                child: const Text('Simpan PIN')),
+          ],
+        ),
+      ),
+    );
+    if (ok == true && mounted) {
+      _enterOwner(storeId, uid);
+    }
+  }
+
+  /// Owner sudah punya PIN -> wajib masukin dengan benar baru bisa masuk.
+  Future<void> _mintaPinOwner(
+      String storeId, String uid, String ownerName) async {
+    final pinCtl = TextEditingController();
+    String? err;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setD) => AlertDialog(
+          title: Text('PIN — $ownerName'),
+          content: Column(mainAxisSize: MainAxisSize.min, children: [
+            const Text('Mode Owner — wajib PIN.',
+                style: TextStyle(color: AppColors.mfg)),
+            const SizedBox(height: 12),
+            TextField(controller: pinCtl, obscureText: true,
+                keyboardType: TextInputType.number, maxLength: 6,
+                autofocus: true,
+                decoration: const InputDecoration(
+                    labelText: 'PIN 6 digit',
+                    border: OutlineInputBorder())),
+            if (err != null) ...[
+              const SizedBox(height: 8),
+              Text(err!, style: const TextStyle(color: Colors.red)),
+            ],
+          ]),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx, false),
+                child: const Text('Batal')),
+            FilledButton(
+                onPressed: () async {
+                  final pin = pinCtl.text.trim();
+                  if (pin.length != 6 || int.tryParse(pin) == null) {
+                    setD(() => err = 'PIN harus 6 digit angka.');
+                    return;
+                  }
+                  try {
+                    final db = ref.read(supabaseProvider);
+                    final valid = await db.rpc('verify_owner_pin', params: {
+                      'p_user_id': uid,
+                      'p_store_id': storeId,
+                      'p_pin_hash': hashOwnerPin(storeId, uid, pin),
+                    }) as bool;
+                    if (!valid) {
+                      setD(() => err = 'PIN salah. Coba lagi.');
+                      return;
+                    }
+                    if (ctx.mounted) Navigator.pop(ctx, true);
+                  } catch (e) {
+                    setD(() => err = '$e');
+                  }
+                },
+                child: const Text('Masuk')),
+          ],
+        ),
+      ),
+    );
+    if (ok == true && mounted) {
+      _enterOwner(storeId, uid);
+    }
+  }
+
+  /// PIN owner valid -> bangun sesi owner -> /shift.
+  Future<void> _enterOwner(String storeId, String uid) async {
+    try {
+      final db = ref.read(supabaseProvider);
+      final mem = await db.from('memberships').select()
+          .eq('user_id', uid).eq('store_id', storeId)
+          .eq('is_active', true).maybeSingle();
+      final store = await db.from('stores').select()
+          .eq('id', storeId).maybeSingle();
+      if (mem == null) return;
+      ref.read(sessionProvider.notifier).set(PosSession(
+        kind: LoginKind.owner, storeId: storeId,
+        storeName: (store?['name'] as String?) ?? 'Toko',
+        actorId: uid,
+        displayName: (mem['display_name'] as String?) ?? 'Owner',
+        role: (mem['role'] as String?) ?? 'owner'));
+      ref.read(cartProvider.notifier).clear();
+      ref.read(shiftProvider.notifier).state = null;
+      if (mounted) Navigator.pushReplacementNamed(context, '/shift');
+    } catch (_) {}
   }
 
   @override
@@ -234,10 +387,10 @@ class _PU extends ConsumerState<PilihUserScreen> {
                           fontSize: 17, fontWeight: FontWeight.w700)),
                   const SizedBox(height: 4),
                   const Text(
-                      'Tiap pengguna punya PIN sendiri. Kasir hanya bisa jualan (tidak bisa tambah menu).',
+                      'SEMUA peran wajib PIN — termasuk Owner. Kasir hanya bisa jualan (tidak bisa tambah menu).',
                       style: TextStyle(color: AppColors.mfg)),
                   const SizedBox(height: 12),
-                  // Kartu owner (kalau sesi punya hak kelola).
+                  // Kartu owner: WAJIB PIN owner (bukan tanpa PIN).
                   if (isPrivileged)
                     Card(
                       child: ListTile(
@@ -245,8 +398,8 @@ class _PU extends ConsumerState<PilihUserScreen> {
                             child: Icon(Icons.verified_user)),
                         title: Text(s.displayName),
                         subtitle: Text(
-                            '${s.roleLabel} — tanpa PIN (sudah login email)'),
-                        trailing: const Icon(Icons.chevron_right),
+                            '${s.roleLabel} — wajib PIN owner'),
+                        trailing: const Icon(Icons.lock),
                         onTap: _asOwner,
                       ),
                     ),

@@ -12,6 +12,13 @@ String hashPin(String storeId, String name, String pin) {
   return sha256.convert(utf8.encode(raw)).toString();
 }
 
+/// Hash PIN owner/admin: SHA-256("storeId:userId:pin").
+/// Disimpan di memberships.pin_hash, verifikasi via RPC verify_owner_pin.
+String hashOwnerPin(String storeId, String userId, String pin) {
+  final raw = '$storeId:${userId.trim()}:$pin';
+  return sha256.convert(utf8.encode(raw)).toString();
+}
+
 // 03b Kelola Kasir (owner/admin) — list staff + tambah + EDIT
 // (nama, peran admin/kasir, reset PIN) + nonaktifkan.
 // Kasir biasa TIDAK boleh buka layar ini (dijaga di build).

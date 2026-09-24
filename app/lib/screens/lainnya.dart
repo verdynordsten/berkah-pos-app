@@ -3,10 +3,115 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/store.dart';
 import '../core/theme.dart';
 import 'shift.dart' show shiftProvider;
+import 'kasir_setup.dart' show hashPin, hashOwnerPin;
 
-// 13 Lainnya — menu owner/kasir: kelola kasir, setup toko, tutup shift, keluar.
+// 13 Lainnya — menu owner/kasir: ganti PIN, kelola kasir, setup toko,
+// tutup shift, keluar. Switch user via Ganti Pengguna (semua wajib PIN).
 class LainnyaScreen extends ConsumerWidget {
   const LainnyaScreen({super.key});
+
+  /// Ganti PIN sendiri: owner (memberships.pin_hash via update langsung,
+  /// wajib PIN lama) atau kasir/admin (staff.pin_hash, wajib PIN lama).
+  Future<void> _gantiPin(BuildContext context, WidgetRef ref) async {
+    final s = ref.read(sessionProvider);
+    if (s == null) return;
+    final lamaCtl = TextEditingController();
+    final baruCtl = TextEditingController();
+    final baru2Ctl = TextEditingController();
+    String? err;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setD) => AlertDialog(
+          title: const Text('Ganti PIN Saya'),
+          content: Column(mainAxisSize: MainAxisSize.min, children: [
+            TextField(controller: lamaCtl, obscureText: true,
+                keyboardType: TextInputType.number, maxLength: 6,
+                decoration: const InputDecoration(
+                    labelText: 'PIN lama', border: OutlineInputBorder())),
+            const SizedBox(height: 12),
+            TextField(controller: baruCtl, obscureText: true,
+                keyboardType: TextInputType.number, maxLength: 6,
+                decoration: const InputDecoration(
+                    labelText: 'PIN baru 6 digit',
+                    border: OutlineInputBorder())),
+            const SizedBox(height: 12),
+            TextField(controller: baru2Ctl, obscureText: true,
+                keyboardType: TextInputType.number, maxLength: 6,
+                decoration: const InputDecoration(
+                    labelText: 'Ulangi PIN baru',
+                    border: OutlineInputBorder())),
+            if (err != null) ...[
+              const SizedBox(height: 8),
+              Text(err!, style: const TextStyle(color: Colors.red)),
+            ],
+          ]),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx, false),
+                child: const Text('Batal')),
+            FilledButton(
+                onPressed: () async {
+                  final lama = lamaCtl.text.trim();
+                  final b1 = baruCtl.text.trim();
+                  final b2 = baru2Ctl.text.trim();
+                  if (b1.length != 6 || int.tryParse(b1) == null) {
+                    setD(() => err = 'PIN baru harus 6 digit angka.');
+                    return;
+                  }
+                  if (b1 != b2) {
+                    setD(() => err = 'PIN baru tidak sama. Ulangi.');
+                    return;
+                  }
+                  try {
+                    final db = ref.read(supabaseProvider);
+                    if (s.kind == LoginKind.owner) {
+                      final u = db.auth.currentUser;
+                      if (u == null) throw StateError('Sesi email habis.');
+                      final valid = await db.rpc('verify_owner_pin', params: {
+                        'p_user_id': u.id,
+                        'p_store_id': s.storeId,
+                        'p_pin_hash':
+                            // ignore: avoid_dynamic_calls
+                            hashOwnerPin(s.storeId, u.id, lama),
+                      }) as bool;
+                      if (!valid) {
+                        setD(() => err = 'PIN lama salah.');
+                        return;
+                      }
+                      await db.from('memberships').update({
+                        'pin_hash': hashOwnerPin(s.storeId, u.id, b1),
+                      }).eq('user_id', u.id).eq('store_id', s.storeId);
+                    } else {
+                      final valid = await db.rpc('verify_staff_pin', params: {
+                        'p_store_id': s.storeId,
+                        'p_name': s.displayName,
+                        'p_pin_hash': hashPin(
+                            s.storeId, s.displayName, lama),
+                      });
+                      if (valid == null) {
+                        setD(() => err = 'PIN lama salah.');
+                        return;
+                      }
+                      await db.from('staff').update({
+                        'pin_hash':
+                            hashPin(s.storeId, s.displayName, b1),
+                      }).eq('id', s.actorId);
+                    }
+                    if (ctx.mounted) Navigator.pop(ctx, true);
+                  } catch (e) {
+                    setD(() => err = '$e');
+                  }
+                },
+                child: const Text('Simpan')),
+          ],
+        ),
+      ),
+    );
+    if (ok == true && context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('PIN diganti.')));
+    }
+  }
 
   Future<void> _tutupShift(BuildContext context, WidgetRef ref) async {
     final s = ref.read(sessionProvider);
@@ -88,10 +193,20 @@ class LainnyaScreen extends ConsumerWidget {
             leading: const Icon(Icons.switch_account,
                 color: AppColors.pri),
             title: const Text('Ganti Pengguna'),
-            subtitle: const Text('Switch kasir / admin tanpa logout'),
+            subtitle: const Text('Switch kasir / admin / owner (wajib PIN)'),
             trailing: const Icon(Icons.chevron_right),
             onTap: () =>
                 Navigator.pushReplacementNamed(context, '/pilih'),
+          ),
+        ),
+        Card(
+          child: ListTile(
+            leading: const Icon(Icons.lock_reset,
+                color: AppColors.pri),
+            title: const Text('Ganti PIN Saya'),
+            subtitle: const Text('Wajib tahu PIN lama'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => _gantiPin(context, ref),
           ),
         ),
         if (s?.canManageMenu == true) ...[

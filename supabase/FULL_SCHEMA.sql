@@ -223,3 +223,30 @@ begin
   return sid;
 end;
 $$;
+
+-- ============ 7. PIN OWNER (memberships.pin_hash, v4) ============
+alter table public.memberships
+  add column if not exists pin_hash text;
+
+-- Verifikasi PIN owner/admin: SHA-256 "storeId:userId:pin".
+-- Masuk mode owner WAJIB PIN — login email saja tidak cukup.
+create or replace function public.verify_owner_pin(
+  p_user_id uuid,
+  p_store_id uuid,
+  p_pin_hash text
+) returns boolean
+language plpgsql
+security definer
+as $$
+declare
+  ok boolean;
+begin
+  select true into ok from public.memberships
+  where user_id = p_user_id
+    and store_id = p_store_id
+    and pin_hash = p_pin_hash
+    and is_active = true
+  limit 1;
+  return coalesce(ok, false);
+end;
+$$;
