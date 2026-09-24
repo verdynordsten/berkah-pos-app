@@ -36,20 +36,24 @@ class _T extends ConsumerState<TokoSetupScreen> {
   }
 
   /// Coba pulihkan sesi dari auth Supabase yang tersimpan di device.
-  /// Return 'ok' (sesi pulih -> ke /pilih), 'notoko' (auth ADA tapi belum
-  /// punya membership -> perlu bikin toko dulu), atau 'login' (belum login
-  /// sama sekali -> tampilkan tombol ke /login).
-  Future<String> _restore() async {
+  /// Return record: status ('ok' / 'notoko' / 'login') + detail error
+  /// (kalau ada) biar layar bisa nampilin PENYEBAB ASLI, bukan cuma
+  /// "Sesi habis". Kasus akun lama: auth valid + toko ADA, tapi query
+  /// membership/store gagal (RLS / network / Supabase mati) -> status
+  /// 'login' + detail error. Jangan dituduh belum punya toko.
+  Future<({String status, String? detail})> _restore() async {
     try {
       final db = ref.read(supabaseProvider);
-      if (db.auth.currentUser == null) return 'login';
+      if (db.auth.currentUser == null) {
+        return (status: 'login', detail: null);
+      }
       final s = await restoreOwnerSession(db);
-      if (s == null) return 'notoko';
+      if (s == null) return (status: 'notoko', detail: null);
       ref.read(sessionProvider.notifier).set(s);
       if (mounted) Navigator.pushReplacementNamed(context, '/pilih');
-      return 'ok';
-    } catch (_) {
-      return 'login';
+      return (status: 'ok', detail: null);
+    } catch (e) {
+      return (status: 'login', detail: '$e');
     }
   }
 
@@ -97,14 +101,18 @@ class _T extends ConsumerState<TokoSetupScreen> {
             return const Scaffold(
                 body: Center(child: CircularProgressIndicator()));
           }
-          if (snap.data == 'ok') {
+          if (snap.data?.status == 'ok') {
             return const Scaffold(
                 body: Center(child: CircularProgressIndicator()));
           }
-          // Auth valid tapi belum punya toko (akun lama tanpa membership /
-          // RPC register gagal): langsung kasih form bikin toko, BUKAN
-          // layar "Sesi habis" yang bikin loop.
-          if (snap.data == 'notoko') return const _BuatTokoForm();
+          // Auth valid tapi belum punya toko (register kepotong / RPC gagal):
+          // langsung kasih form bikin toko, BUKAN layar "Sesi habis".
+          if (snap.data?.status == 'notoko') {
+            return const _BuatTokoForm();
+          }
+          // Belum login ATAU query DB gagal (RLS/network/Supabase mati).
+          // Tampilkan PENYEBAB ASLI biar ketahuan, jangan cuma "Sesi habis".
+          final detail = snap.data?.detail;
           return Scaffold(
             appBar: AppBar(title: const Text('Setup Toko')),
             body: Center(
@@ -116,6 +124,27 @@ class _T extends ConsumerState<TokoSetupScreen> {
                       const Text(
                           'Sesi habis. Masuk lagi dulu ya.',
                           textAlign: TextAlign.center),
+                      if (detail != null) ...[
+                        const SizedBox(height: 8),
+                        Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: AppColors.mut,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(
+                            'Penyebab: $detail',
+                            style: const TextStyle(
+                                fontSize: 11, color: AppColors.mfg),
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        const Text(
+                          'Screenshot teks ini ke developer.',
+                          style: TextStyle(
+                              fontSize: 11, color: AppColors.mfg),
+                        ),
+                      ],
                       const SizedBox(height: 16),
                       FilledButton(
                         onPressed: () => Navigator.pushNamedAndRemoveUntil(
