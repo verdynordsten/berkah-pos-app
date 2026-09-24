@@ -1,0 +1,15 @@
+@echo off
+REM ============================================================
+REM  KEYS.bat — KUNCI SUPABASE LOKAL (JANGAN DI-COMMIT!)
+REM  File ini TIDAK masuk git (ada di .gitignore), jadi aman
+REM  dari ketiban `git pull`.
+REM
+REM  CARA PAKAI (sekali aja):
+REM    1. Copy file ini jadi KEYS.bat  (di folder yang sama, app\)
+REM    2. Ganti 2 baris bawah dengan kunci dari Supabase Dashboard
+REM       Settings - Data API - Project URL + anon public key
+REM    3. Save. RUN.bat otomatis baca file ini tiap diklik.
+REM ============================================================
+
+set SUPABASE_URL=https://xyz.supabase.co
+set SUPABASE_ANON_KEY=eyJhbGciOi...

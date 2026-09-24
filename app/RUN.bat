@@ -11,9 +11,18 @@ cd /d "%~dp0"
 echo Folder kerja: %CD%
 echo.
 
-REM --- GANTI 2 BARIS INI DENGAN KUNCI SUPABASE LO ---
+REM --- Baca kunci dari KEYS.bat (lokal, tidak di-commit) ---
+REM --- Kalau belum ada, pakai placeholder (app kebuka tapi katalog kosong) ---
 set SUPABASE_URL=https://xyz.supabase.co
 set SUPABASE_ANON_KEY=eyJhbGciOi...
+if exist "%~dp0KEYS.bat" (
+  call "%~dp0KEYS.bat"
+  echo Kunci dibaca dari KEYS.bat.
+) else (
+  echo   [!] KEYS.bat belum ada — copy KEYS.bat.example jadi KEYS.bat lalu isi.
+  echo   [!] Lanjut dengan kunci placeholder.
+)
+echo.
 
 echo.
 echo  [1/4] Cek Flutter...
