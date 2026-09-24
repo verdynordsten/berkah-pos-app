@@ -40,27 +40,8 @@ class _R extends ConsumerState<RegisterScreen> {
         'p_store_name': store,
         'p_display_name': name,
       }) as String;
-      // Default: kasir contoh + kategori + produk kopi agar katalog langsung isi.
-      await db.from('staff').insert({'store_id': sid, 'name': 'Kasir 1', 'pin_hash': '-'});
-      final cats = await db.from('categories').insert([
-        {'store_id': sid, 'name': 'Minuman', 'sort': 1},
-        {'store_id': sid, 'name': 'Makanan', 'sort': 2},
-        {'store_id': sid, 'name': 'Snack', 'sort': 3},
-      ]).select();
-      String? catId(String n) {
-        for (final c in (cats as List)) {
-          final m = (c as Map).cast<String, dynamic>();
-          if ((m['name'] as String?) == n) return m['id'] as String?;
-        }
-        return null;
-      }
-      await db.from('products').insert([
-        {'store_id': sid, 'category_id': catId('Minuman'), 'name': 'Kopi Susu Gula Aren', 'price': 18000, 'stock': 50},
-        {'store_id': sid, 'category_id': catId('Minuman'), 'name': 'Americano', 'price': 15000, 'stock': 50},
-        {'store_id': sid, 'category_id': catId('Minuman'), 'name': 'Teh Manis', 'price': 8000, 'stock': 50},
-        {'store_id': sid, 'category_id': catId('Makanan'), 'name': 'Indomie Goreng', 'price': 12000, 'stock': 40},
-        {'store_id': sid, 'category_id': catId('Snack'), 'name': 'Pisang Goreng', 'price': 10000, 'stock': 30},
-      ]);
+      // Toko baru = kosong total. Owner isi sendiri via
+      // Setup Toko -> Kelola Kasir -> Tambah Produk.
       ref.read(sessionProvider.notifier).set(PosSession(
         kind: LoginKind.owner, storeId: sid, storeName: store,
         actorId: uid, displayName: name, role: 'owner'));
