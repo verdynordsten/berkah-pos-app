@@ -55,6 +55,15 @@ class _R extends ConsumerState<RegisterScreen> {
           'pin_hash': hashOwnerPin(sid, uid, pin),
         }).eq('user_id', uid).eq('store_id', sid);
       } catch (_) {}
+      // Seed template shift default (DB lama yang RPC-nya belum v7:
+      // on-conflict do nothing = aman kalau RPC sudah seed duluan).
+      try {
+        await db.from('shift_templates').upsert([
+          {'store_id': sid, 'name': 'Pagi', 'start_hour': 7, 'end_hour': 15, 'sort': 0},
+          {'store_id': sid, 'name': 'Siang', 'start_hour': 15, 'end_hour': 23, 'sort': 1},
+          {'store_id': sid, 'name': 'Malam', 'start_hour': 23, 'end_hour': 7, 'sort': 2},
+        ], onConflict: 'store_id,name');
+      } catch (_) {}
       // Toko baru = kosong total. Owner isi sendiri via
       // Setup Toko -> Kelola Kasir -> Tambah Produk.
       ref.read(sessionProvider.notifier).set(PosSession(

@@ -122,22 +122,90 @@ class LainnyaScreen extends ConsumerWidget {
           content: Text('Tidak ada shift aktif.')));
       return;
     }
-    final ctl = TextEditingController();
+    // Hitung kas ekspektasi: modal awal + tunai masuk shift ini
+    // (Tunai only — QRIS/Debit/E-Wallet masuk rekening, bukan laci).
+    // + kas masuk manual - kas keluar manual (cash_moves shift ini).
+    double tunai = 0;
+    double kasIn = 0, kasOut = 0;
+    try {
+      final db = ref.read(supabaseProvider);
+      final trx = await db.from('transactions').select('total,pay_method')
+          .eq('shift_id', sh['id'] as String);
+      for (final t in (trx as List).cast<Map<String, dynamic>>()) {
+        if (((t['pay_method'] ?? '').toString()).toLowerCase() == 'tunai') {
+          tunai += (((t['total'] as num?) ?? 0).toDouble());
+        }
+      }
+      final since = (sh['opened_at'] ?? '').toString();
+      var q = db.from('cash_moves').select('kind,amount')
+          .eq('store_id', s.storeId);
+      if (since.isNotEmpty) q = q.gte('created_at', since);
+      final moves = await q;
+      for (final m in (moves as List).cast<Map<String, dynamic>>()) {
+        final a = (((m['amount'] as num?) ?? 0).toDouble());
+        if ((m['kind'] ?? 'out') == 'in') {
+          kasIn += a;
+        } else {
+          kasOut += a;
+        }
+      }
+    } catch (_) {}
+    final modalAwal = (((sh['opening_cash'] as num?) ?? 0).toDouble());
+    final ekspektasi = modalAwal + tunai + kasIn - kasOut;
+    final ctl = TextEditingController(text: ekspektasi.toStringAsFixed(0));
     final ok = await showDialog<bool>(
       context: context,
-      builder: (_) => AlertDialog(
-        title: const Text('Tutup Shift'),
-        content: TextField(controller: ctl,
-            keyboardType: TextInputType.number,
-            decoration: const InputDecoration(
-                labelText: 'Kas akhir (Rp)',
-                border: OutlineInputBorder())),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false),
-              child: const Text('Batal')),
-          FilledButton(onPressed: () => Navigator.pop(context, true),
-              child: const Text('Tutup')),
-        ],
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setD) {
+          final aktual = double.tryParse(
+                  ctl.text.replaceAll('.', '').replaceAll(',', '.')) ??
+              0;
+          final selisih = aktual - ekspektasi;
+          return AlertDialog(
+            title: const Text('Tutup Shift'),
+            content: SingleChildScrollView(
+              child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                _rek('Modal awal', rp(modalAwal)),
+                _rek('Tunai masuk', rp(tunai)),
+                _rek('Kas masuk', rp(kasIn)),
+                _rek('Kas keluar', rp(kasOut)),
+                const Divider(),
+                _rek('Kas seharusnya (laci)', rp(ekspektasi), bold: true),
+                const SizedBox(height: 12),
+                TextField(controller: ctl,
+                    keyboardType: TextInputType.number,
+                    onChanged: (_) => setD(() {}),
+                    decoration: const InputDecoration(
+                        labelText: 'Kas aktual di laci (Rp)',
+                        border: OutlineInputBorder())),
+                const SizedBox(height: 8),
+                Text(
+                  selisih == 0
+                      ? 'Pas — tidak ada selisih.'
+                      : selisih > 0
+                          ? 'Lebih ${rp(selisih)} dari seharusnya.'
+                          : 'Kurang ${rp(-selisih)} dari seharusnya.',
+                  style: TextStyle(
+                      fontWeight: FontWeight.w600,
+                      color: selisih == 0
+                          ? AppColors.ok
+                          : selisih > 0
+                              ? AppColors.pri
+                              : AppColors.dan),
+                ),
+              ]),
+            ),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(context, false),
+                  child: const Text('Batal')),
+              FilledButton(onPressed: () => Navigator.pop(context, true),
+                  child: const Text('Tutup')),
+            ],
+          );
+        },
       ),
     );
     if (ok != true) return;
@@ -163,6 +231,18 @@ class LainnyaScreen extends ConsumerWidget {
             .showSnackBar(SnackBar(content: Text('Gagal: $e')));
       }
     }
+  }
+
+  Widget _rek(String k, String v, {bool bold = false}) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 2),
+      child: Row(children: [
+        Expanded(child: Text(k)),
+        Text(v,
+            style: TextStyle(
+                fontWeight: bold ? FontWeight.w800 : FontWeight.w600)),
+      ]),
+    );
   }
 
   Future<void> _logout(BuildContext context, WidgetRef ref) async {

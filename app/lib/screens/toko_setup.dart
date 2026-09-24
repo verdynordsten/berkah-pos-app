@@ -24,6 +24,9 @@ class _T extends ConsumerState<TokoSetupScreen> {
   final _tax = TextEditingController();
   final _step = TextEditingController();
   final _pval = TextEditingController();
+  final _modalDef = TextEditingController();
+  List<Map<String, dynamic>> _shifts = [];
+  bool _shiftsLoaded = false;
   bool _busy = false;
   bool _loaded = false;
   String? _err;
@@ -38,7 +41,130 @@ class _T extends ConsumerState<TokoSetupScreen> {
     _tax.text = '${row['tax_percent'] ?? 10}';
     _step.text = '${row['point_step'] ?? 10000}';
     _pval.text = '${row['point_value'] ?? 100}';
+    _modalDef.text = '${row['default_opening_cash'] ?? 0}';
     setState(() => _loaded = true);
+    // Template shift per-toko (DB lama tanpa tabel v7 -> fallback default).
+    try {
+      final trows = await db.from('shift_templates').select()
+          .eq('store_id', storeId).order('sort');
+      _shifts = (trows as List).cast<Map<String, dynamic>>();
+    } catch (_) {
+      _shifts = [
+        {'name': 'Pagi', 'start_hour': 7, 'end_hour': 15, 'sort': 0},
+        {'name': 'Siang', 'start_hour': 15, 'end_hour': 23, 'sort': 1},
+        {'name': 'Malam', 'start_hour': 23, 'end_hour': 7, 'sort': 2},
+      ];
+    }
+    if (mounted) setState(() => _shiftsLoaded = true);
+  }
+
+  String _fmtJam(int h) => '${h.toString().padLeft(2, '0')}:00';
+
+  Future<void> _shiftDialog({Map<String, dynamic>? cur, int? idx}) async {
+    final nCtl = TextEditingController(text: (cur?['name'] ?? '').toString());
+    int sh = ((cur?['start_hour'] as num?) ?? 7).toInt();
+    int eh = ((cur?['end_hour'] as num?) ?? 15).toInt();
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setD) => AlertDialog(
+          title: Text(cur == null ? 'Tambah Shift' : 'Ubah Shift'),
+          content: Column(mainAxisSize: MainAxisSize.min, children: [
+            TextField(controller: nCtl,
+                decoration: const InputDecoration(
+                    labelText: 'Nama shift (cth: Pagi)',
+                    border: OutlineInputBorder())),
+            const SizedBox(height: 12),
+            Row(children: [
+              Expanded(
+                child: DropdownButtonFormField<int>(
+                  value: sh,
+                  decoration: const InputDecoration(
+                      labelText: 'Mulai', border: OutlineInputBorder()),
+                  items: [for (var h = 0; h < 24; h++)
+                    DropdownMenuItem(value: h, child: Text(_fmtJam(h)))],
+                  onChanged: (v) => setD(() => sh = v ?? sh),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: DropdownButtonFormField<int>(
+                  value: eh,
+                  decoration: const InputDecoration(
+                      labelText: 'Selesai', border: OutlineInputBorder()),
+                  items: [for (var h = 0; h < 24; h++)
+                    DropdownMenuItem(value: h, child: Text(_fmtJam(h)))],
+                  onChanged: (v) => setD(() => eh = v ?? eh),
+                ),
+              ),
+            ]),
+            const SizedBox(height: 8),
+            const Text(
+              'Jam selesai boleh < jam mulai (cth: 23→07 = lewat tengah malam).',
+              style: TextStyle(fontSize: 11, color: AppColors.mfg)),
+          ]),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx, false),
+                child: const Text('Batal')),
+            FilledButton(onPressed: () => Navigator.pop(ctx, true),
+                child: const Text('Simpan')),
+          ],
+        ),
+      ),
+    );
+    if (ok != true) return;
+    final nm = nCtl.text.trim();
+    if (nm.isEmpty) {
+      setState(() => _err = 'Nama shift wajib diisi.');
+      return;
+    }
+    setState(() {
+      _err = null;
+      final entry = {
+        if (cur?['id'] != null) 'id': cur!['id'],
+        'name': nm, 'start_hour': sh, 'end_hour': eh,
+        'sort': idx ?? _shifts.length,
+      };
+      if (idx == null) {
+        _shifts = [..._shifts, entry];
+      } else {
+        final c = [..._shifts];
+        c[idx] = entry;
+        _shifts = c;
+      }
+    });
+  }
+
+  Future<void> _shiftDelete(int idx) async {
+    final cur = _shifts[idx];
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Hapus shift?'),
+        content: Text('${cur['name']} (${_fmtJam((cur['start_hour'] as num).toInt())}–${_fmtJam((cur['end_hour'] as num).toInt())})'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Batal')),
+          FilledButton(onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('Hapus')),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    try {
+      if (cur['id'] != null) {
+        await ref.read(supabaseProvider).from('shift_templates')
+            .delete().eq('id', cur['id'] as String);
+      }
+    } catch (e) {
+      if (mounted) setState(() => _err = 'Gagal hapus: $e');
+      return;
+    }
+    setState(() {
+      final c = [..._shifts];
+      c.removeAt(idx);
+      _shifts = c;
+    });
   }
 
   /// Coba pulihkan sesi dari auth Supabase yang tersimpan di device.
@@ -77,6 +203,9 @@ class _T extends ConsumerState<TokoSetupScreen> {
       final tax = double.tryParse(_tax.text.replaceAll(',', '.')) ?? 10;
       final step = double.tryParse(_step.text.replaceAll(',', '.')) ?? 10000;
       final pval = double.tryParse(_pval.text.replaceAll(',', '.')) ?? 100;
+      final modalDef = double.tryParse(
+              _modalDef.text.replaceAll('.', '').replaceAll(',', '.')) ??
+          0;
       await db.from('stores').update({
         'name': _name.text.trim(),
         'address': _addr.text.trim(),
@@ -84,7 +213,31 @@ class _T extends ConsumerState<TokoSetupScreen> {
         'tax_percent': tax,
         'point_step': step > 0 ? step : 10000,
         'point_value': pval < 0 ? 0 : pval,
+        'default_opening_cash': modalDef < 0 ? 0 : modalDef,
       }).eq('id', s.storeId);
+      // Simpan template shift per-toko (upsert per baris, bawa id kalau ada).
+      try {
+        for (var i = 0; i < _shifts.length; i++) {
+          final t = _shifts[i];
+          await db.from('shift_templates').upsert({
+            if (t['id'] != null) 'id': t['id'],
+            'store_id': s.storeId,
+            'name': (t['name'] ?? '').toString(),
+            'start_hour': (t['start_hour'] as num).toInt(),
+            'end_hour': (t['end_hour'] as num).toInt(),
+            'sort': i,
+            'is_active': true,
+          }, onConflict: 'store_id,name');
+        }
+      } catch (e) {
+        // DB lama tanpa tabel v7: profil toko tetap kesimpan, shift
+        // fallback hardcoded di layar shift.
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+              content: Text(
+                  'Toko disimpan, tapi daftar shift gagal: $e (jalankan migrasi v7).')));
+        }
+      }
       ref.read(sessionProvider.notifier).set(PosSession(
         kind: s.kind, storeId: s.storeId,
         storeName: _name.text.trim().isEmpty ? s.storeName : _name.text.trim(),
@@ -226,6 +379,72 @@ class _T extends ConsumerState<TokoSetupScreen> {
                     border: OutlineInputBorder())),
           ),
         ]),
+        const SizedBox(height: 16),
+        const Text('Modal awal kas default (Rp)',
+            style: TextStyle(fontWeight: FontWeight.w600)),
+        const SizedBox(height: 2),
+        const Text(
+          'Dipakai kalau shift terakhir belum ada kas akhir (toko baru). Kalau ada, modal ngikutin kas akhir shift terakhir.',
+          style: TextStyle(fontSize: 11, color: AppColors.mfg)),
+        const SizedBox(height: 6),
+        TextField(controller: _modalDef,
+            keyboardType: TextInputType.number,
+            decoration: const InputDecoration(
+                hintText: 'cth: 200000', border: OutlineInputBorder())),
+        const SizedBox(height: 16),
+        Row(children: [
+          const Expanded(
+            child: Text('Daftar shift toko ini',
+                style: TextStyle(fontWeight: FontWeight.w600)),
+          ),
+          TextButton.icon(
+            onPressed: () => _shiftDialog(),
+            icon: const Icon(Icons.add, size: 18),
+            label: const Text('Tambah'),
+          ),
+        ]),
+        const SizedBox(height: 2),
+        const Text(
+          'Tiap toko punya jam sendiri. Shift yang lagi jalan (sesuai jam sekarang) kepilih otomatis pas buka shift.',
+          style: TextStyle(fontSize: 11, color: AppColors.mfg)),
+        const SizedBox(height: 6),
+        if (!_shiftsLoaded)
+          const Card(
+              child: ListTile(
+                  leading: SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2)),
+                  title: Text('Memuat shift...'))),
+        for (var i = 0; i < _shifts.length; i++)
+          Card(
+            child: ListTile(
+              leading: const Icon(Icons.schedule, color: AppColors.pri),
+              title: Text('${_shifts[i]['name']}',
+                  style: const TextStyle(fontWeight: FontWeight.w600)),
+              subtitle: Text(
+                  '${_fmtJam((_shifts[i]['start_hour'] as num).toInt())} – ${_fmtJam((_shifts[i]['end_hour'] as num).toInt())}'),
+              trailing: Row(mainAxisSize: MainAxisSize.min, children: [
+                IconButton(
+                  tooltip: 'Ubah',
+                  icon: const Icon(Icons.edit, size: 20),
+                  onPressed: () =>
+                      _shiftDialog(cur: _shifts[i], idx: i),
+                ),
+                IconButton(
+                  tooltip: 'Hapus',
+                  icon: const Icon(Icons.delete_outline,
+                      size: 20, color: Colors.red),
+                  onPressed: () => _shiftDelete(i),
+                ),
+              ]),
+            ),
+          ),
+        if (_shiftsLoaded && _shifts.isEmpty)
+          const Card(
+              child: ListTile(
+                  title: Text(
+                      'Belum ada shift — tambah dulu (min. 1).'))),
         if (_err != null) ...[
           const SizedBox(height: 8),
           Text(_err!, style: const TextStyle(color: Colors.red)),
@@ -296,6 +515,14 @@ class _BTF extends ConsumerState<_BuatTokoForm> {
         final hp = hashOwnerPin(sid, u.id, pin);
         await db.from('memberships').update({'pin_hash': hp})
             .eq('user_id', u.id).eq('store_id', sid);
+      } catch (_) {}
+      // Seed template shift default (aman double-seed via on-conflict).
+      try {
+        await db.from('shift_templates').upsert([
+          {'store_id': sid, 'name': 'Pagi', 'start_hour': 7, 'end_hour': 15, 'sort': 0},
+          {'store_id': sid, 'name': 'Siang', 'start_hour': 15, 'end_hour': 23, 'sort': 1},
+          {'store_id': sid, 'name': 'Malam', 'start_hour': 23, 'end_hour': 7, 'sort': 2},
+        ], onConflict: 'store_id,name');
       } catch (_) {}
       ref.read(sessionProvider.notifier).set(PosSession(
         kind: LoginKind.owner, storeId: sid, storeName: store,

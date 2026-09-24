@@ -250,3 +250,57 @@ begin
   return coalesce(ok, false);
 end;
 $$;
+
+-- ============ 8. SHIFT PER-TOKO + MODAL DEFAULT (v7) ============
+-- Daftar shift + jam per toko (diatur owner dari Setup Toko).
+create table if not exists public.shift_templates (
+  id uuid primary key default gen_random_uuid(),
+  store_id uuid not null references public.stores(id) on delete cascade,
+  name text not null,
+  start_hour int not null default 7,
+  end_hour int not null default 15,
+  sort int not null default 0,
+  is_active boolean not null default true,
+  created_at timestamptz not null default now(),
+  unique (store_id, name)
+);
+create index if not exists shift_templates_store_idx
+  on public.shift_templates(store_id);
+
+alter table public.stores
+  add column if not exists default_opening_cash numeric not null default 0;
+
+alter table public.shift_templates enable row level security;
+drop policy if exists "mvp_all" on public.shift_templates;
+create policy "mvp_all" on public.shift_templates
+  for all using (true) with check (true);
+
+-- RPC register ikut seed 3 shift default buat toko baru.
+create or replace function public.create_store_with_owner(
+  p_user_id uuid,
+  p_store_name text,
+  p_display_name text default 'Owner'
+) returns uuid
+language plpgsql
+security definer
+as $$
+declare
+  sid uuid;
+begin
+  insert into public.stores (name) values (nullif(trim(p_store_name), ''))
+  returning id into sid;
+
+  insert into public.memberships (store_id, user_id, role, display_name)
+  values (sid, p_user_id, 'owner', nullif(trim(p_display_name), 'Owner'))
+  on conflict (store_id, user_id) do update
+    set role = 'owner', display_name = excluded.display_name;
+
+  insert into public.shift_templates (store_id, name, start_hour, end_hour, sort)
+  values (sid, 'Pagi', 7, 15, 0),
+         (sid, 'Siang', 15, 23, 1),
+         (sid, 'Malam', 23, 7, 2)
+  on conflict (store_id, name) do nothing;
+
+  return sid;
+end;
+$$;
