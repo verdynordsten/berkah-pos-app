@@ -1,19 +1,54 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../core/store.dart';
 import '../core/theme.dart';
 
-// 01 Splash — biru penuh, logo toko, nama, versi
-class SplashScreen extends StatefulWidget {
+// 01 Splash — cek Supabase session: ada -> pulihkan membership -> /toko / /pin.
+// Tidak ada -> /login. Register selalu tersedia dari login.
+class SplashScreen extends ConsumerStatefulWidget {
   const SplashScreen({super.key});
   @override
-  State<SplashScreen> createState() => _S();
+  ConsumerState<SplashScreen> createState() => _S();
 }
 
-class _S extends State<SplashScreen> {
+class _S extends ConsumerState<SplashScreen> {
   @override
   void initState() {
     super.initState();
-    Future.delayed(const Duration(seconds: 2),
-        () => Navigator.pushReplacementNamed(context, '/login'));
+    _route();
+  }
+
+  Future<void> _route() async {
+    await Future.delayed(const Duration(seconds: 2));
+    if (!mounted) return;
+    try {
+      final db = ref.read(supabaseProvider);
+      final sess = db.auth.currentSession;
+      if (sess?.user != null) {
+        final uid = sess!.user.id;
+        final mem = await db.from('memberships').select().eq('user_id', uid)
+            .eq('is_active', true).order('created_at').limit(1).maybeSingle();
+        if (mem != null) {
+          final store = await db.from('stores').select()
+              .eq('id', mem['store_id'] as String).maybeSingle();
+          ref.read(sessionProvider.notifier).set(PosSession(
+            kind: LoginKind.owner,
+            storeId: mem['store_id'] as String,
+            storeName: (store?['name'] as String?) ?? 'Toko',
+            actorId: uid,
+            displayName: (mem['display_name'] as String?) ?? 'Owner',
+            role: (mem['role'] as String?) ?? 'staff'));
+          if (!mounted) return;
+          final s = ref.read(sessionProvider)!;
+          Navigator.pushReplacementNamed(
+              context, s.isOwner ? '/toko' : '/pin');
+          return;
+        }
+      }
+    } catch (_) {
+      // jatuh ke login
+    }
+    if (mounted) Navigator.pushReplacementNamed(context, '/login');
   }
 
   @override

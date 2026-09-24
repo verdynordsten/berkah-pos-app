@@ -1,9 +1,69 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import '../core/store.dart';
 import '../core/theme.dart';
 
-// 02 Login — username + password + fingerprint
-class LoginScreen extends StatelessWidget {
+// 02 Login — 2 pintu:
+//  A. Owner/Admin: email + password (Supabase Auth) -> /katalog (owner) / lanjut PIN.
+//  B. Kasir: nama + PIN? -> pindah ke layar PIN (/pin) yang verifikasi via RPC.
+class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
+  @override
+  ConsumerState<LoginScreen> createState() => _L();
+}
+
+class _L extends ConsumerState<LoginScreen> {
+  final _email = TextEditingController();
+  final _pass = TextEditingController();
+  bool _busy = false;
+  String? _err;
+
+  Future<void> _loginOwner() async {
+    final email = _email.text.trim();
+    final pass = _pass.text;
+    if (email.isEmpty || pass.isEmpty) {
+      setState(() => _err = 'Isi email + password.');
+      return;
+    }
+    setState(() { _busy = true; _err = null; });
+    try {
+      final db = ref.read(supabaseProvider);
+      final res = await db.auth.signInWithPassword(
+          email: email, password: pass);
+      final uid = res.user?.id;
+      if (uid == null) throw StateError('Login gagal.');
+      final mem = await db.from('memberships').select().eq('user_id', uid)
+          .eq('is_active', true).order('created_at').limit(1).maybeSingle();
+      if (mem == null) {
+        // User auth ada tapi belum punya toko (mis. RPC gagal di register)
+        // -> arahkan bikin toko.
+        if (mounted) Navigator.pushReplacementNamed(context, '/toko_baru');
+        return;
+      }
+      final store = await db.from('stores').select()
+          .eq('id', mem['store_id'] as String).maybeSingle();
+      ref.read(sessionProvider.notifier).set(PosSession(
+        kind: LoginKind.owner,
+        storeId: mem['store_id'] as String,
+        storeName: (store?['name'] as String?) ?? 'Toko',
+        actorId: uid,
+        displayName: (mem['display_name'] as String?) ?? 'Owner',
+        role: (mem['role'] as String?) ?? 'staff'));
+      if (mounted) {
+        final s = ref.read(sessionProvider)!;
+        Navigator.pushReplacementNamed(
+            context, s.isOwner ? '/toko' : '/pin');
+      }
+    } on AuthException catch (e) {
+      setState(() => _err = e.message);
+    } catch (e) {
+      setState(() => _err = '$e');
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -28,34 +88,38 @@ class LoginScreen extends StatelessWidget {
             child: Text('Masuk untuk mulai berjualan',
                 style: TextStyle(color: AppColors.mfg))),
         const SizedBox(height: 16),
-        const Text('Username',
+        const Text('Email owner / admin',
             style: TextStyle(fontWeight: FontWeight.w600)),
         const SizedBox(height: 6),
-        const TextField(decoration: InputDecoration(
-            hintText: 'andi_kasir', border: OutlineInputBorder())),
+        TextField(controller: _email,
+            keyboardType: TextInputType.emailAddress,
+            decoration: const InputDecoration(
+                hintText: 'kamu@toko.id', border: OutlineInputBorder())),
         const SizedBox(height: 12),
         const Text('Password',
             style: TextStyle(fontWeight: FontWeight.w600)),
         const SizedBox(height: 6),
-        const TextField(
+        TextField(controller: _pass,
             obscureText: true,
-            decoration: InputDecoration(
+            decoration: const InputDecoration(
                 hintText: '••••••••', border: OutlineInputBorder())),
-        Align(
-          alignment: Alignment.centerRight,
-          child: TextButton(
-              onPressed: () {},
-              child: const Text('Lupa password?')),
-        ),
+        if (_err != null) ...[
+          const SizedBox(height: 8),
+          Text(_err!, style: const TextStyle(color: Colors.red)),
+        ],
+        const SizedBox(height: 12),
         FilledButton(
+            onPressed: _busy ? null : _loginOwner,
+            child: Text(_busy ? 'Masuk...' : 'Masuk')),
+        const SizedBox(height: 4),
+        OutlinedButton(
             onPressed: () =>
                 Navigator.pushReplacementNamed(context, '/pin'),
-            child: const Text('Masuk')),
-        const SizedBox(height: 8),
-        const Center(
-            child: Text('atau masuk dengan fingerprint',
-                style:
-                    TextStyle(fontSize: 12, color: AppColors.mfg))),
+            child: const Text('Saya kasir (login PIN)')),
+        TextButton(
+            onPressed: () =>
+                Navigator.pushReplacementNamed(context, '/register'),
+            child: const Text('Belum punya akun? Daftar')),
       ]),
     );
   }

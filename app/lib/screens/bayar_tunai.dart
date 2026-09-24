@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../core/theme.dart';
 import '../core/store.dart';
+import 'shift.dart' show shiftProvider;
 
 // 09 Bayar Tunai — metode + denom + kembalian + simpan ke Supabase
 class BayarTunaiScreen extends ConsumerStatefulWidget {
@@ -143,14 +144,15 @@ Future<void> _save(String method, double total, double paid,
   final db = Supabase.instance.client;
   final cart = ref.read(cartProvider);
   final ctl = ref.read(cartProvider.notifier);
+  final session = ref.read(sessionProvider);
+  if (session == null) throw StateError('Sesi habis — login ulang.');
+  final shift = ref.read(shiftProvider);
   final sub = ctl.subtotal;
   final disc = sub * 0.10;
   final tax = (sub - disc) * 0.10;
-  // store pertama (demo)
-  final store =
-      await db.from('stores').select('id').limit(1).single();
   final trx = await db.from('transactions').insert({
-    'store_id': store['id'],
+    'store_id': session.storeId,
+    'shift_id': shift?['id'],
     'code': '#${DateTime.now().millisecondsSinceEpoch % 100000}',
     'subtotal': sub, 'discount': disc, 'tax': tax, 'total': total,
     'pay_method': method, 'paid': paid, 'change': change,
@@ -158,13 +160,23 @@ Future<void> _save(String method, double total, double paid,
   for (final l in cart) {
     await db.from('transaction_items').insert({
       'transaction_id': trx['id'],
+      'product_id': l.product.id,
       'name': l.product.name, 'price': l.product.price,
       'qty': l.qty, 'line_total': l.total,
     });
     await db.from('stock_moves').insert({
-      'store_id': store['id'], 'product_id': l.product.id,
+      'store_id': session.storeId, 'product_id': l.product.id,
       'qty': -l.qty, 'reason': 'sale',
     });
+    // Kurangi stok produk langsung (MVP; trigger DB bisa menyusul).
+    try {
+      final cur = await db.from('products').select('stock')
+          .eq('id', l.product.id).single();
+      final next = ((cur['stock'] as int?) ?? 0) - l.qty;
+      await db.from('products').update({'stock': next < 0 ? 0 : next})
+          .eq('id', l.product.id);
+    } catch (_) {}
   }
+  ref.invalidate(productsProvider);
   ctl.clear();
 }

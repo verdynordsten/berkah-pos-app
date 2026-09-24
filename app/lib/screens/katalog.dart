@@ -18,16 +18,32 @@ class _K extends ConsumerState<KatalogScreen> {
   Widget build(BuildContext context) {
     final prods = ref.watch(productsProvider);
     final cart = ref.watch(cartProvider);
-    final cats = ['Semua', 'Minuman', 'Makanan', 'Snack'];
+    final catsAsync = ref.watch(categoriesProvider);
+    final storeAsync = ref.watch(storeProfileProvider);
+    final session = ref.watch(sessionProvider);
+    final cats = ['Semua',
+      ...((catsAsync.valueOrNull ?? [])
+          .map((c) => (c['name'] as String?) ?? '')
+          .where((n) => n.isNotEmpty && n != 'Semua'))];
+    if (!cats.contains(cat)) cat = 'Semua';
+    final catIdOf = <String, String>{};
+    for (final c in (catsAsync.valueOrNull ?? [])) {
+      catIdOf[(c['name'] as String?) ?? ''] = (c['id'] as String?) ?? '';
+    }
+    final storeName = (storeAsync.valueOrNull?['name'] as String?)
+        ?? session?.storeName ?? 'Toko';
+    final cashierLine = session == null
+        ? ''
+        : '${session.displayName}${session.isOwner ? ' — Owner' : ''}';
     return Scaffold(
       appBar: AppBar(
-        title: const Column(
+        title: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('Toko Berkah Jaya',
-                  style: TextStyle(fontWeight: FontWeight.w700)),
-              Text('Andi - Shift Pagi',
-                  style: TextStyle(fontSize: 11, color: AppColors.mfg)),
+              Text(storeName,
+                  style: const TextStyle(fontWeight: FontWeight.w700)),
+              Text(cashierLine,
+                  style: const TextStyle(fontSize: 11, color: AppColors.mfg)),
             ]),
         leading: const Padding(
           padding: EdgeInsets.all(8),
@@ -72,13 +88,17 @@ class _K extends ConsumerState<KatalogScreen> {
                 const Center(child: CircularProgressIndicator()),
             error: (e, _) => Center(
                 child: Text(
-                    'Butuh Supabase: jalankan dengan --dart-define\n$e',
+                    'Gagal muat. Cek koneksi / .env Supabase.\n$e',
                     textAlign: TextAlign.center)),
             data: (list) {
               final f = list
                   .where((p) =>
-                      q.isEmpty ||
-                      p.name.toLowerCase().contains(q.toLowerCase()))
+                      (cat == 'Semua' ||
+                          p.categoryId == (catIdOf[cat] ?? '__')) &&
+                      (q.isEmpty ||
+                          p.name
+                              .toLowerCase()
+                              .contains(q.toLowerCase())))
                   .toList();
               return GridView.builder(
                 padding: const EdgeInsets.all(12),

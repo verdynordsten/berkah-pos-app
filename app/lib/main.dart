@@ -4,6 +4,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'core/theme.dart';
 import 'screens/splash.dart';
+import 'screens/register.dart';
+import 'screens/toko_setup.dart';
+import 'screens/kasir_setup.dart';
 import 'screens/login.dart';
 import 'screens/pin.dart';
 import 'screens/shift.dart';
@@ -46,6 +49,10 @@ class BerkahPos extends StatelessWidget {
       initialRoute: '/splash',
       routes: {
         '/splash': (_) => const SplashScreen(),
+        '/register': (_) => const RegisterScreen(),
+        '/toko': (_) => const TokoSetupScreen(),
+        '/toko_baru': (_) => const TokoSetupScreen(),
+        '/kasir': (_) => const KasirSetupScreen(),
         '/login': (_) => const LoginScreen(),
         '/pin': (_) => const PinScreen(),
         '/shift': (_) => const ShiftScreen(),

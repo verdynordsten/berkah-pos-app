@@ -5,7 +5,7 @@ final supabaseProvider = Provider<SupabaseClient>((ref) {
   return Supabase.instance.client;
 });
 
-// ---- Models (ringkas, sesuai schema.sql) ----
+// ---- Models (ringkas, sesuai schema.sql + schema_v2.sql) ----
 class Product {
   final String id, name;
   final double price;
@@ -15,7 +15,7 @@ class Product {
     required this.stock, this.photoUrl, this.categoryId});
   factory Product.fromMap(Map<String, dynamic> m) => Product(
     id: m['id'] as String, name: m['name'] as String,
-    price: (m['price'] as num).toDouble(), stock: m['stock'] as int,
+    price: (m['price'] as num).toDouble(), stock: (m['stock'] as int?) ?? 0,
     photoUrl: m['photo_url'] as String?, categoryId: m['category_id'] as String?);
 }
 
@@ -56,17 +56,54 @@ class Cart extends StateNotifier<List<CartLine>> {
 
 final cartProvider = StateNotifierProvider<Cart, List<CartLine>>((ref) => Cart());
 
+// ============ SESSION (siapa yang buka app + toko aktif) ============
+/// Sumber login: owner/admin via Supabase Auth, atau kasir via PIN.
+enum LoginKind { owner, staffPin }
+
+class PosSession {
+  final LoginKind kind;
+  final String storeId;
+  final String storeName;
+  /// user_id (owner) atau staff_id (kasir PIN)
+  final String actorId;
+  final String displayName;
+  final String role; // owner / admin / staff
+  const PosSession({required this.kind, required this.storeId,
+    required this.storeName, required this.actorId,
+    required this.displayName, required this.role});
+  bool get isOwner => role == 'owner';
+}
+
+class SessionCtl extends StateNotifier<PosSession?> {
+  SessionCtl() : super(null);
+  void set(PosSession s) => state = s;
+  void clear() => state = null;
+}
+
+final sessionProvider = StateNotifierProvider<SessionCtl, PosSession?>((ref) => SessionCtl());
+
 final productsProvider = FutureProvider<List<Product>>((ref) async {
   final db = ref.watch(supabaseProvider);
-  final rows = await db.from('products')
-      .select()
-      .eq('is_active', true)
-      .order('name');
+  final session = ref.watch(sessionProvider);
+  var q = db.from('products').select().eq('is_active', true);
+  if (session != null) q = q.eq('store_id', session.storeId);
+  final rows = await q.order('name');
   return (rows as List).map((e) => Product.fromMap(e)).toList();
 });
 
 final categoriesProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
   final db = ref.watch(supabaseProvider);
-  final rows = await db.from('categories').select().order('sort');
+  final session = ref.watch(sessionProvider);
+  var q = db.from('categories').select();
+  if (session != null) q = q.eq('store_id', session.storeId);
+  final rows = await q.order('sort');
   return (rows as List).cast<Map<String, dynamic>>();
+});
+
+/// Profil toko aktif (nama/alamat/telp/pajak) — dipakai katalog + struk.
+final storeProfileProvider = FutureProvider<Map<String, dynamic>?>((ref) async {
+  final session = ref.watch(sessionProvider);
+  if (session == null) return null;
+  final db = ref.watch(supabaseProvider);
+  return await db.from('stores').select().eq('id', session.storeId).maybeSingle();
 });
