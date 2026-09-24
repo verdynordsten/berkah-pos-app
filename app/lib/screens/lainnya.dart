@@ -151,7 +151,11 @@ class LainnyaScreen extends ConsumerWidget {
       }).eq('id', sh['id'] as String);
       ref.read(shiftProvider.notifier).state = null;
       if (context.mounted) {
-        Navigator.pushReplacementNamed(context, '/shift');
+        // Kill-switch: buang SEMUA layar jualan, balik ke shift.
+        // Back dari shift = keluar app (tidak bisa nyasar ke katalog
+        // tanpa shift aktif).
+        Navigator.pushNamedAndRemoveUntil(
+            context, '/shift', (_) => false);
       }
     } catch (e) {
       if (context.mounted) {

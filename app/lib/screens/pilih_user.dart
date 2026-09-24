@@ -465,6 +465,16 @@ class _PU extends ConsumerState<PilihUserScreen> {
                       label: const Text('Setup Toko'),
                     ),
                   ],
+                  // Owner multi-outlet: ganti toko tanpa logout.
+                  if (s.kind == LoginKind.owner) ...[
+                    const SizedBox(height: 8),
+                    OutlinedButton.icon(
+                      onPressed: () => Navigator.pushNamedAndRemoveUntil(
+                          context, '/toko_list', (_) => false),
+                      icon: const Icon(Icons.storefront),
+                      label: const Text('Ganti Toko'),
+                    ),
+                  ],
                 ]),
     );
   }

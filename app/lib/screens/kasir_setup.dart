@@ -244,10 +244,14 @@ class _K extends ConsumerState<KasirSetupScreen> {
             return Center(child: Text('Gagal: ${snap.error}'));
           }
           final list = snap.data ?? [];
+          // Mode register (tidak bisa pop): jelaskan ini langkah 2/2.
+          final isOnboarding = !Navigator.canPop(context);
           return ListView(padding: const EdgeInsets.all(16), children: [
-            const Text(
-                'Tiap kasir/admin punya PIN sendiri. Kasir hanya bisa jualan.',
-                style: TextStyle(color: AppColors.mfg)),
+            Text(
+                isOnboarding
+                    ? 'Langkah 2/2 — tambah kasir kalau perlu, atau langsung Selesai.'
+                    : 'Tiap kasir/admin punya PIN sendiri. Kasir hanya bisa jualan.',
+                style: const TextStyle(color: AppColors.mfg)),
             const SizedBox(height: 12),
             ...list.map((r) {
               final admin = _roleOf(r) == 'admin';

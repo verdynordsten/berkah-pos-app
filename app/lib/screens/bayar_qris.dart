@@ -126,12 +126,12 @@ class _Q extends ConsumerState<BayarQrisScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Pembayaran QRIS'),
-        // Back dari QRIS: ke keranjang (bukan ke pelanggan/tunai biar
-        // tidak loop paket promo). Timer dibatalkan di dispose.
+        // Back dari QRIS: buang tunai+pelanggan, balik ke katalog.
+        // (replace ke keranjang bikin back nyasar ke pelanggan = loop.)
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
-          onPressed: () => Navigator.pushReplacementNamed(
-              context, '/keranjang'),
+          onPressed: () => Navigator.pushNamedAndRemoveUntil(
+              context, '/katalog', (_) => false),
         ),
       ),
       body: ListView(padding: const EdgeInsets.all(16), children: [
