@@ -2,3 +2,5 @@
 # Kunci Supabase lokal — jangan commit!
 KEYS.bat
 .env
+.flutter-plugins
+.flutter-plugins-dependencies
