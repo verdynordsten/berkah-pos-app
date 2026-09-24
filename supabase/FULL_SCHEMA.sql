@@ -53,9 +53,8 @@ create table if not exists public.shifts (
   opening_cash numeric not null default 0,
   closing_cash numeric,
   opened_at timestamptz not null default now(),
-  closed_at timestamptz,
-  user_id uuid references auth.users(id) on delete set null,
-  staff_id uuid references public.staff(id) on delete set null
+  closed_at timestamptz
+  -- NOTE: kolom user_id / staff_id ditambah di bawah (setelah tabel staff ada)
 );
 
 create table if not exists public.transactions (
