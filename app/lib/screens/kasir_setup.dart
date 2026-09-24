@@ -12,8 +12,9 @@ String hashPin(String storeId, String name, String pin) {
   return sha256.convert(utf8.encode(raw)).toString();
 }
 
-// 03b Kelola Kasir (owner) — list staff + tambah (nama+PIN) + nonaktifkan.
-// Dibuka setelah setup toko. Selesai -> /katalog (mode owner).
+// 03b Kelola Kasir (owner/admin) — list staff + tambah + EDIT
+// (nama, peran admin/kasir, reset PIN) + nonaktifkan.
+// Kasir biasa TIDAK boleh buka layar ini (dijaga di build).
 class KasirSetupScreen extends ConsumerStatefulWidget {
   const KasirSetupScreen({super.key});
   @override
@@ -28,49 +29,108 @@ class _K extends ConsumerState<KasirSetupScreen> {
     return (rows as List).cast<Map<String, dynamic>>();
   }
 
-  Future<void> _add(String storeId) async {
-    final nameCtl = TextEditingController();
+  String _roleOf(Map<String, dynamic> r) {
+    final v = (r['role'] as String?)?.toLowerCase() ?? 'kasir';
+    return v == 'admin' ? 'admin' : 'kasir';
+  }
+
+  /// Dialog tambah ATAU edit. Kalau [existing] null = tambah baru.
+  Future<void> _form(String storeId,
+      {Map<String, dynamic>? existing}) async {
+    final isEdit = existing != null;
+    final nameCtl =
+        TextEditingController(text: (existing?['name'] as String?) ?? '');
     final pinCtl = TextEditingController();
+    String role = isEdit ? _roleOf(existing!) : 'kasir';
     final ok = await showDialog<bool>(
       context: context,
-      builder: (_) => AlertDialog(
-        title: const Text('Tambah Kasir'),
-        content: Column(mainAxisSize: MainAxisSize.min, children: [
-          TextField(controller: nameCtl,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setD) => AlertDialog(
+          title: Text(isEdit ? 'Edit Kasir' : 'Tambah Kasir'),
+          content: Column(mainAxisSize: MainAxisSize.min, children: [
+            TextField(controller: nameCtl,
+                decoration: const InputDecoration(
+                    labelText: 'Nama kasir',
+                    border: OutlineInputBorder())),
+            const SizedBox(height: 12),
+            DropdownButtonFormField<String>(
+              value: role,
               decoration: const InputDecoration(
-                  labelText: 'Nama kasir', border: OutlineInputBorder())),
-          const SizedBox(height: 12),
-          TextField(controller: pinCtl, obscureText: true,
-              keyboardType: TextInputType.number, maxLength: 6,
-              decoration: const InputDecoration(
-                  labelText: 'PIN 6 digit', border: OutlineInputBorder())),
-        ]),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false),
-              child: const Text('Batal')),
-          FilledButton(onPressed: () => Navigator.pop(context, true),
-              child: const Text('Simpan')),
-        ],
+                  labelText: 'Peran', border: OutlineInputBorder()),
+              items: const [
+                DropdownMenuItem(
+                    value: 'kasir',
+                    child: Text('Kasir — jualan saja')),
+                DropdownMenuItem(
+                    value: 'admin',
+                    child: Text('Admin — bisa kelola menu')),
+              ],
+              onChanged: (v) => setD(() => role = v ?? 'kasir'),
+            ),
+            const SizedBox(height: 12),
+            TextField(controller: pinCtl, obscureText: true,
+                keyboardType: TextInputType.number, maxLength: 6,
+                decoration: InputDecoration(
+                    labelText: isEdit
+                        ? 'PIN baru 6 digit (kosongkan = tidak ganti)'
+                        : 'PIN 6 digit',
+                    border: const OutlineInputBorder())),
+          ]),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx, false),
+                child: const Text('Batal')),
+            FilledButton(onPressed: () => Navigator.pop(ctx, true),
+                child: const Text('Simpan')),
+          ],
+        ),
       ),
     );
     if (ok != true) return;
     final name = nameCtl.text.trim();
     final pin = pinCtl.text.trim();
-    if (name.isEmpty || pin.length != 6 || int.tryParse(pin) == null) {
+    if (name.isEmpty) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-            content: Text('Nama wajib isi, PIN harus 6 digit angka.')));
+            content: Text('Nama wajib diisi.')));
       }
       return;
     }
+    if (!isEdit || pin.isNotEmpty) {
+      if (pin.length != 6 || int.tryParse(pin) == null) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+              content: Text('PIN harus 6 digit angka.')));
+        }
+        return;
+      }
+    }
     try {
       final db = ref.read(supabaseProvider);
-      await db.from('staff').insert({
-        'store_id': storeId,
-        'name': name,
-        'pin_hash': hashPin(storeId, name, pin),
-      });
-      if (mounted) setState(() {});
+      if (!isEdit) {
+        await db.from('staff').insert({
+          'store_id': storeId,
+          'name': name,
+          'role': role,
+          'pin_hash': hashPin(storeId, name, pin),
+        });
+      } else {
+        final payload = <String, dynamic>{
+          'name': name,
+          'role': role,
+        };
+        if (pin.isNotEmpty) {
+          payload['pin_hash'] = hashPin(storeId, name, pin);
+        }
+        await db.from('staff').update(payload)
+            .eq('id', existing!['id'] as String);
+      }
+      if (mounted) {
+        setState(() {});
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text(isEdit
+                ? 'Kasir diperbarui.'
+                : 'Kasir ditambah. PIN tiap user beda-beda.')));
+      }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context)
@@ -86,12 +146,54 @@ class _K extends ConsumerState<KasirSetupScreen> {
     if (mounted) setState(() {});
   }
 
+  Future<void> _hapus(Map<String, dynamic> row) async {
+    final y = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Hapus kasir?'),
+        content: Text(
+            '${row['name']} tidak bisa login lagi. Riwayat transaksi tetap ada.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false),
+              child: const Text('Batal')),
+          FilledButton(onPressed: () => Navigator.pop(context, true),
+              child: const Text('Hapus')),
+        ],
+      ),
+    );
+    if (y != true) return;
+    try {
+      final db = ref.read(supabaseProvider);
+      await db.from('staff').delete().eq('id', row['id'] as String);
+      if (mounted) setState(() {});
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Gagal: $e')));
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final s = ref.watch(sessionProvider);
     if (s == null) {
       return const Scaffold(
           body: Center(child: Text('Belum login. Kembali & masuk dulu.')));
+    }
+    // KUNCI: kasir tidak boleh kelola user lain.
+    if (!s.canManageMenu) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Kelola Kasir')),
+        body: const Center(
+          child: Padding(
+            padding: EdgeInsets.all(32),
+            child: Text(
+              'Hanya Owner / Admin yang boleh kelola kasir.\nAkun kasir hanya bisa jualan.',
+              textAlign: TextAlign.center),
+          ),
+        ),
+      );
     }
     return Scaffold(
       appBar: AppBar(title: const Text('Kelola Kasir')),
@@ -106,34 +208,61 @@ class _K extends ConsumerState<KasirSetupScreen> {
           }
           final list = snap.data ?? [];
           return ListView(padding: const EdgeInsets.all(16), children: [
-            const Text('Langkah 2/2 — kasir login pakai nama + PIN di HP yang sama',
+            const Text(
+                'Tiap kasir/admin punya PIN sendiri. Kasir hanya bisa jualan.',
                 style: TextStyle(color: AppColors.mfg)),
             const SizedBox(height: 12),
-            ...list.map((r) => Card(
-                  child: ListTile(
-                    leading: CircleAvatar(
-                        child: Text(((r['name'] as String?) ?? '?')
-                            .substring(0, 1).toUpperCase())),
-                    title: Text((r['name'] as String?) ?? '-'),
-                    subtitle: Text((r['is_active'] == true)
-                        ? 'Aktif' : 'Nonaktif'),
-                    trailing: TextButton(
-                      onPressed: () => _toggle(r),
-                      child: Text((r['is_active'] == true)
-                          ? 'Nonaktifkan' : 'Aktifkan'),
-                    ),
+            ...list.map((r) {
+              final admin = _roleOf(r) == 'admin';
+              final active = r['is_active'] == true;
+              return Card(
+                child: ListTile(
+                  leading: CircleAvatar(
+                      backgroundColor:
+                          admin ? AppColors.pri.withValues(alpha: 0.15) : null,
+                      child: Text(
+                          (((r['name'] as String?) ?? '?')
+                              .substring(0, 1)
+                              .toUpperCase()))),
+                  title: Text((r['name'] as String?) ?? '-',
+                      style: const TextStyle(fontWeight: FontWeight.w600)),
+                  subtitle: Text(
+                      '${admin ? 'Admin' : 'Kasir'} — ${active ? 'Aktif' : 'Nonaktif'}'),
+                  trailing: PopupMenuButton<String>(
+                    icon: const Icon(Icons.more_vert),
+                    onSelected: (v) {
+                      if (v == 'edit') {
+                        _form(s.storeId, existing: r);
+                      } else if (v == 'toggle') {
+                        _toggle(r);
+                      } else if (v == 'hapus') {
+                        _hapus(r);
+                      }
+                    },
+                    itemBuilder: (_) => [
+                      const PopupMenuItem(
+                          value: 'edit', child: Text('Edit (nama/peran/PIN)')),
+                      PopupMenuItem(
+                          value: 'toggle',
+                          child: Text(active ? 'Nonaktifkan' : 'Aktifkan')),
+                      const PopupMenuItem(
+                          value: 'hapus', child: Text('Hapus')),
+                    ],
                   ),
-                )),
+                  onTap: () => _form(s.storeId, existing: r),
+                ),
+              );
+            }),
             const SizedBox(height: 12),
             OutlinedButton.icon(
-              onPressed: () => _add(s.storeId),
+              onPressed: () => _form(s.storeId),
               icon: const Icon(Icons.add),
               label: const Text('Tambah Kasir')),
             const SizedBox(height: 12),
             FilledButton(
                 onPressed: () =>
-                    Navigator.pushReplacementNamed(context, '/katalog'),
-                child: const Text('Selesai — Buka Kasir')),
+                    Navigator.pushReplacementNamed(context, '/pilih'),
+                child: const Text('Selesai — Pilih Pengguna')),
           ]);
         },
       ),

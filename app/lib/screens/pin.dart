@@ -75,7 +75,8 @@ class _P extends ConsumerState<PinScreen> {
       if (sid == null) throw StateError('PIN salah. Coba lagi.');
       ref.read(sessionProvider.notifier).set(PosSession(
         kind: LoginKind.staffPin, storeId: storeId, storeName: storeName,
-        actorId: sid as String, displayName: name, role: 'staff'));
+        actorId: sid as String, displayName: name,
+        role: ((row['role'] as String?) == 'admin') ? 'admin' : 'kasir'));
       if (mounted) Navigator.pushReplacementNamed(context, '/shift');
     } catch (e) {
       setState(() { err = '$e'; pin = ''; });

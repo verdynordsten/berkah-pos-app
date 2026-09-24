@@ -67,11 +67,19 @@ class PosSession {
   /// user_id (owner) atau staff_id (kasir PIN)
   final String actorId;
   final String displayName;
-  final String role; // owner / admin / staff
+  final String role; // owner / admin / kasir
   const PosSession({required this.kind, required this.storeId,
     required this.storeName, required this.actorId,
     required this.displayName, required this.role});
   bool get isOwner => role == 'owner';
+  bool get isAdmin => role == 'admin';
+  /// Owner + admin boleh kelola menu. Kasir (staff) tidak.
+  bool get canManageMenu => isOwner || isAdmin;
+  String get roleLabel {
+    if (isOwner) return 'Owner';
+    if (isAdmin) return 'Admin';
+    return 'Kasir';
+  }
 }
 
 class SessionCtl extends StateNotifier<PosSession?> {

@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/store.dart';
 import '../core/theme.dart';
 
-// 01 Splash — cek Supabase session: ada -> pulihkan membership -> /toko / /pin.
+// 01 Splash — cek Supabase session: ada -> pulihkan membership -> /pilih.
 // Tidak ada -> /login. Register selalu tersedia dari login.
 class SplashScreen extends ConsumerStatefulWidget {
   const SplashScreen({super.key});
@@ -39,9 +39,7 @@ class _S extends ConsumerState<SplashScreen> {
             displayName: (mem['display_name'] as String?) ?? 'Owner',
             role: (mem['role'] as String?) ?? 'staff'));
           if (!mounted) return;
-          final s = ref.read(sessionProvider)!;
-          Navigator.pushReplacementNamed(
-              context, s.isOwner ? '/toko' : '/pin');
+          Navigator.pushReplacementNamed(context, '/pilih');
           return;
         }
       }

@@ -34,7 +34,7 @@ class _K extends ConsumerState<KatalogScreen> {
         ?? session?.storeName ?? 'Toko';
     final cashierLine = session == null
         ? ''
-        : '${session.displayName}${session.isOwner ? ' — Owner' : ''}';
+        : '${session.displayName} — ${session.roleLabel}';
     return Scaffold(
       appBar: AppBar(
         title: Column(
@@ -101,7 +101,7 @@ class _K extends ConsumerState<KatalogScreen> {
                               .contains(q.toLowerCase())))
                   .toList();
               if (f.isEmpty) {
-                final isOwnerNow = session?.isOwner == true;
+                final canMenu = session?.canManageMenu == true;
                 return Center(
                   child: Padding(
                     padding: const EdgeInsets.all(32),
@@ -132,13 +132,13 @@ class _K extends ConsumerState<KatalogScreen> {
                           Text(
                               q.isNotEmpty
                                   ? 'Coba kata lain atau kategori lain.'
-                                  : isOwnerNow
+                                  : canMenu
                                       ? 'Tambah menu pertama biar bisa jualan.'
-                                      : 'Minta owner tambah produk dulu.',
+                                      : 'Minta owner / admin tambah produk dulu.',
                               textAlign: TextAlign.center,
                               style: const TextStyle(
                                   color: AppColors.mfg)),
-                          if (isOwnerNow &&
+                          if (canMenu &&
                               q.isEmpty) ...[
                             const SizedBox(height: 16),
                             FilledButton.icon(
@@ -315,8 +315,8 @@ class _K extends ConsumerState<KatalogScreen> {
           ),
       ]),
 
-      // Owner: tombol + tambah produk langsung dari katalog.
-      floatingActionButton: session?.isOwner == true
+      // Owner/Admin: tombol + tambah produk. Kasir: disembunyikan.
+      floatingActionButton: session?.canManageMenu == true
           ? FloatingActionButton(
               onPressed: () =>
                   Navigator.pushNamed(context, '/produk_baru'),

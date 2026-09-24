@@ -5,8 +5,8 @@ import '../core/store.dart';
 import '../core/theme.dart';
 
 // 02 Login — 2 pintu:
-//  A. Owner/Admin: email + password (Supabase Auth) -> /katalog (owner) / lanjut PIN.
-//  B. Kasir: nama + PIN? -> pindah ke layar PIN (/pin) yang verifikasi via RPC.
+//  A. Owner/Admin: email + password (Supabase Auth) -> /pilih (pilih pengguna).
+//  B. Kasir: nama + PIN -> layar PIN (/pin) verifikasi via RPC -> /shift.
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
   @override
@@ -51,9 +51,8 @@ class _L extends ConsumerState<LoginScreen> {
         displayName: (mem['display_name'] as String?) ?? 'Owner',
         role: (mem['role'] as String?) ?? 'staff'));
       if (mounted) {
-        final s = ref.read(sessionProvider)!;
-        Navigator.pushReplacementNamed(
-            context, s.isOwner ? '/toko' : '/pin');
+        // Login sukses -> pilih mau jualan sebagai siapa -> shift -> dashboard.
+        Navigator.pushReplacementNamed(context, '/pilih');
       }
     } on AuthException catch (e) {
       setState(() => _err = e.message);

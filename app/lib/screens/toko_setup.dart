@@ -34,6 +34,11 @@ class _T extends ConsumerState<TokoSetupScreen> {
   Future<void> _save() async {
     final s = ref.read(sessionProvider);
     if (s == null) return;
+    // KUNCI: setup toko hanya owner/admin.
+    if (!s.canManageMenu) {
+      setState(() => _err = 'Hanya Owner / Admin yang boleh ubah toko.');
+      return;
+    }
     setState(() { _busy = true; _err = null; });
     try {
       final db = ref.read(supabaseProvider);

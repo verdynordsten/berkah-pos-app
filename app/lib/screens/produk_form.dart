@@ -36,6 +36,11 @@ class _PF extends ConsumerState<ProdukFormScreen> {
   Future<void> _save() async {
     final s = ref.read(sessionProvider);
     if (s == null) return;
+    // KUNCI: kasir tidak boleh tambah/edit produk walau nekat buka route.
+    if (!s.canManageMenu) {
+      setState(() => _err = 'Hanya Owner / Admin yang boleh kelola menu.');
+      return;
+    }
     final name = _name.text.trim();
     final price = double.tryParse(
             _price.text.replaceAll('.', '').replaceAll(',', '.')) ??

@@ -79,11 +79,22 @@ class LainnyaScreen extends ConsumerWidget {
                 style:
                     const TextStyle(fontWeight: FontWeight.w700)),
             subtitle: Text(
-                '${s?.storeName ?? ''} — ${s?.role ?? ''}${sh != null ? '\nShift: ${sh['label']}' : '\nBelum buka shift'}'),
+                '${s?.storeName ?? ''} — ${s?.roleLabel ?? ''}${sh != null ? '\nShift: ${sh['label']}' : '\nBelum buka shift'}'),
           ),
         ),
         const SizedBox(height: 12),
-        if (s?.isOwner == true) ...[
+        Card(
+          child: ListTile(
+            leading: const Icon(Icons.switch_account,
+                color: AppColors.pri),
+            title: const Text('Ganti Pengguna'),
+            subtitle: const Text('Switch kasir / admin tanpa logout'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () =>
+                Navigator.pushReplacementNamed(context, '/pilih'),
+          ),
+        ),
+        if (s?.canManageMenu == true) ...[
           Card(
             child: ListTile(
               leading: const Icon(Icons.inventory_2,

@@ -64,7 +64,7 @@ class DetailScreen extends ConsumerWidget {
                   Navigator.pop(context);
                 },
                 child: const Text('Tambah ke Keranjang')),
-            if (session?.isOwner == true) ...[
+            if (session?.canManageMenu == true) ...[
               const SizedBox(height: 8),
               OutlinedButton(
                   onPressed: () async {

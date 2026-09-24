@@ -125,6 +125,22 @@ alter table public.shifts
   add column if not exists user_id uuid references auth.users(id) on delete set null,
   add column if not exists staff_id uuid references public.staff(id) on delete set null;
 
+-- ============ 3b. STAFF: kolom peran (kasir / admin) ===========
+alter table public.staff
+  add column if not exists role text not null default 'kasir';
+
+do $$
+begin
+  if not exists (
+    select 1 from pg_constraint where conname = 'staff_role_chk'
+  ) then
+    alter table public.staff
+      add constraint staff_role_chk
+      check (role in ('kasir', 'admin'));
+  end if;
+end
+$$;
+
 -- ============ 4. RLS + POLICY (MVP allow-all via anon key) ============
 alter table public.stores enable row level security;
 alter table public.categories enable row level security;
