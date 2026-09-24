@@ -55,8 +55,10 @@ create policy "mvp_all" on public.memberships for all using (true) with check (t
 create policy "mvp_all" on public.staff for all using (true) with check (true);
 
 -- ============ 5. RPC: register toko baru dalam 1 transaksi ============
--- Dipanggil app setelah signUp: bikin store + membership owner sekaligus.
+-- Dipanggil app setelah signUp dengan user_id eksplisit (jangan auth.uid()
+-- karena bisa null kalau email-confirmation menyala).
 create or replace function public.create_store_with_owner(
+  p_user_id uuid,
   p_store_name text,
   p_display_name text default 'Owner'
 ) returns uuid
@@ -70,7 +72,7 @@ begin
   returning id into sid;
 
   insert into public.memberships (store_id, user_id, role, display_name)
-  values (sid, auth.uid(), 'owner', nullif(trim(p_display_name), 'Owner'))
+  values (sid, p_user_id, 'owner', nullif(trim(p_display_name), 'Owner'))
   on conflict (store_id, user_id) do update
     set role = 'owner', display_name = excluded.display_name;
 

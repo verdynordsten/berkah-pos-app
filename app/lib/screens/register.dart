@@ -34,8 +34,9 @@ class _R extends ConsumerState<RegisterScreen> {
       final res = await db.auth.signUp(email: email, password: pass);
       final uid = res.user?.id;
       if (uid == null) throw StateError('Registrasi gagal — cek email/password.');
-      // Bikin toko + membership owner via RPC (security definer).
+      // Bikin toko + membership owner via RPC (user_id eksplisit dari signUp).
       final sid = await db.rpc('create_store_with_owner', params: {
+        'p_user_id': uid,
         'p_store_name': store,
         'p_display_name': name,
       }) as String;
