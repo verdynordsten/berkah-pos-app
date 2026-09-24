@@ -29,8 +29,8 @@ class _K extends ConsumerState<KasirSetupScreen> {
     return (rows as List).cast<Map<String, dynamic>>();
   }
 
-  String _roleOf(Map<String, dynamic> r) {
-    final v = (r['role'] as String?)?.toLowerCase() ?? 'kasir';
+  String _roleOf(Map<String, dynamic>? r) {
+    final v = (r?['role'] as String?)?.toLowerCase() ?? 'kasir';
     return v == 'admin' ? 'admin' : 'kasir';
   }
 
@@ -41,7 +41,7 @@ class _K extends ConsumerState<KasirSetupScreen> {
     final nameCtl =
         TextEditingController(text: (existing?['name'] as String?) ?? '');
     final pinCtl = TextEditingController();
-    String role = isEdit ? _roleOf(existing!) : 'kasir';
+    String role = isEdit ? _roleOf(existing) : 'kasir';
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => StatefulBuilder(
@@ -54,7 +54,7 @@ class _K extends ConsumerState<KasirSetupScreen> {
                     border: OutlineInputBorder())),
             const SizedBox(height: 12),
             DropdownButtonFormField<String>(
-              value: role,
+              initialValue: role,
               decoration: const InputDecoration(
                   labelText: 'Peran', border: OutlineInputBorder()),
               items: const [
@@ -122,7 +122,7 @@ class _K extends ConsumerState<KasirSetupScreen> {
           payload['pin_hash'] = hashPin(storeId, name, pin);
         }
         await db.from('staff').update(payload)
-            .eq('id', existing!['id'] as String);
+            .eq('id', existing['id'] as String);
       }
       if (mounted) {
         setState(() {});

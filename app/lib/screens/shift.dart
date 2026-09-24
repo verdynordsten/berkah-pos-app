@@ -65,12 +65,15 @@ class _Sh extends ConsumerState<ShiftScreen> {
               style: const TextStyle(color: AppColors.mfg)),
         const SizedBox(height: 8),
         ...shifts.map((o) => Card(
-              child: RadioListTile<String>(
-                value: o,
+              child: RadioGroup<String>(
                 groupValue: label,
                 onChanged: (v) => setState(() => label = v!),
-                title: Text(o,
-                    style: const TextStyle(fontWeight: FontWeight.w600)),
+                child: RadioListTile<String>(
+                  value: o,
+                  title: Text(o,
+                      style:
+                          const TextStyle(fontWeight: FontWeight.w600)),
+                ),
               ),
             )),
         const SizedBox(height: 12),
