@@ -4,9 +4,11 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../core/store.dart';
 import '../core/theme.dart';
 
-// 02 Login — 2 pintu:
-//  A. Owner/Admin: email + password (Supabase Auth) -> /pilih (pilih pengguna).
-//  B. Kasir: nama + PIN -> layar PIN (/pin) verifikasi via RPC -> /shift.
+// 02 Login — 1 pintu: email + password owner (Supabase Auth).
+// Sukses -> /pilih (pilih mau jualan sebagai Owner/Admin/Kasir).
+// Tidak ada lagi login PIN global dari sini — kasir dipilih DI DALAM
+// setelah login, jadi data kasir selalu scope per-toko (Vina toko A
+// tidak akan muncul di device toko B).
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
   @override
@@ -110,11 +112,6 @@ class _L extends ConsumerState<LoginScreen> {
         FilledButton(
             onPressed: _busy ? null : _loginOwner,
             child: Text(_busy ? 'Masuk...' : 'Masuk')),
-        const SizedBox(height: 4),
-        OutlinedButton(
-            onPressed: () =>
-                Navigator.pushReplacementNamed(context, '/pin'),
-            child: const Text('Saya kasir (login PIN)')),
         TextButton(
             onPressed: () =>
                 Navigator.pushReplacementNamed(context, '/register'),
