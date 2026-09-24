@@ -11,6 +11,7 @@ import 'screens/produk_form.dart';
 import 'screens/riwayat.dart';
 import 'screens/lainnya.dart';
 import 'screens/login.dart';
+import 'screens/pin.dart';
 import 'screens/pilih_user.dart';
 import 'screens/shift.dart';
 import 'screens/katalog.dart';
@@ -57,6 +58,7 @@ class BerkahPos extends StatelessWidget {
         '/toko_baru': (_) => const TokoSetupScreen(),
         '/kasir': (_) => const KasirSetupScreen(),
         '/login': (_) => const LoginScreen(),
+        '/pin': (_) => const PinScreen(),
         '/pilih': (_) => const PilihUserScreen(),
         '/shift': (_) => const ShiftScreen(),
         '/katalog': (_) => const KatalogScreen(),
