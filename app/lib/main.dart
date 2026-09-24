@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'core/theme.dart';
@@ -16,8 +17,17 @@ import 'screens/sukses.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  const url = String.fromEnvironment('SUPABASE_URL', defaultValue: '');
-  const key = String.fromEnvironment('SUPABASE_ANON_KEY', defaultValue: '');
+  // Kunci dibaca dari file .env (runtime). Prioritas:
+  // 1. --dart-define (kalau diisi, menang)  2. file .env  3. kosong (mode offline)
+  try {
+    await dotenv.load(fileName: '.env');
+  } catch (_) {
+    // .env belum ada — lanjut dengan dart-define / mode offline
+  }
+  const defineUrl = String.fromEnvironment('SUPABASE_URL', defaultValue: '');
+  const defineKey = String.fromEnvironment('SUPABASE_ANON_KEY', defaultValue: '');
+  final url = defineUrl.isNotEmpty ? defineUrl : (dotenv.env['SUPABASE_URL'] ?? '');
+  final key = defineKey.isNotEmpty ? defineKey : (dotenv.env['SUPABASE_ANON_KEY'] ?? '');
   if (url.isNotEmpty && key.isNotEmpty) {
     // ignore: deprecated_member_use (supabase_flutter 2.x masih pakai anonKey)
     await Supabase.initialize(url: url, anonKey: key);

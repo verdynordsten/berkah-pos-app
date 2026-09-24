@@ -1,3 +1,4 @@
 
 # Kunci Supabase lokal — jangan commit!
 KEYS.bat
+.env

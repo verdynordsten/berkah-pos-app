@@ -11,18 +11,14 @@ cd /d "%~dp0"
 echo Folder kerja: %CD%
 echo.
 
-REM --- Baca kunci dari KEYS.bat (lokal, tidak di-commit) ---
-REM --- Kalau belum ada, pakai placeholder (app kebuka tapi katalog kosong) ---
-set SUPABASE_URL=https://xyz.supabase.co
-set SUPABASE_ANON_KEY=eyJhbGciOi...
-if exist "%~dp0KEYS.bat" (
-  call "%~dp0KEYS.bat"
-  echo Kunci dibaca dari KEYS.bat.
-) else (
-  echo   [!] KEYS.bat belum ada — copy KEYS.bat.example jadi KEYS.bat lalu isi.
-  echo   [!] Lanjut dengan kunci placeholder.
+REM --- Kunci dibaca app dari file .env (lihat .env.example) ---
+REM --- RUN.bat cuma mastiin file-nya ada, tidak bawa kunci lagi ---
+if not exist "%~dp0.env" (
+  echo   [!] File .env belum ada!
+  echo   [!] Copy .env.example jadi .env lalu isi kunci Supabase lo.
+  echo   [!] Lanjut dulu — app kebuka tapi katalog kosong (mode offline).
+  echo.
 )
-echo.
 
 echo.
 echo  [1/4] Cek Flutter...
@@ -41,7 +37,7 @@ echo  [4/4] Jalanin app ke device pertama yang ketemu...
 echo  Kalau ada lebih dari 1 device, tutup salah satu ATAU
 echo  jalankan manual: flutter run -d <device-id> ...
 echo.
-call flutter run --dart-define=SUPABASE_URL=%SUPABASE_URL% --dart-define=SUPABASE_ANON_KEY=%SUPABASE_ANON_KEY% || (echo   [X] flutter run gagal. Baca error merah di atas. & pause & exit /b 1)
+call flutter run || (echo   [X] flutter run gagal. Baca error merah di atas. & pause & exit /b 1)
 
 echo.
 echo  SUKSES — app jalan. Tekan r = hot reload, R = restart, q = keluar.
