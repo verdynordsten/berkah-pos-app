@@ -37,9 +37,17 @@ class DetailScreen extends ConsumerWidget {
                 decoration: BoxDecoration(
                     color: AppColors.mut,
                     borderRadius: BorderRadius.circular(16)),
-                child: const Center(
-                    child: Icon(Icons.inventory_2,
-                        size: 64, color: AppColors.mfg))),
+                clipBehavior: Clip.antiAlias,
+                child: ((p['photo_url'] as String?)?.isNotEmpty == true)
+                    ? Image.network((p['photo_url'] as String?)!,
+                        fit: BoxFit.cover,
+                        width: double.infinity,
+                        errorBuilder: (_, __, ___) => const Center(
+                            child: Icon(Icons.inventory_2,
+                                size: 64, color: AppColors.mfg)))
+                    : const Center(
+                        child: Icon(Icons.inventory_2,
+                            size: 64, color: AppColors.mfg))),
             const SizedBox(height: 10),
             Text((p['name'] as String?) ?? '-',
                 style: const TextStyle(

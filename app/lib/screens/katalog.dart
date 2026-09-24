@@ -210,13 +210,31 @@ class _K extends ConsumerState<KatalogScreen> {
                                               borderRadius:
                                                   BorderRadius.circular(
                                                       12)),
-                                      child: const Center(
-                                          child: Icon(
-                                              Icons
-                                                  .coffee,
-                                              size: 40,
-                                              color: AppColors
-                                                  .pri)),
+                                      clipBehavior: Clip.antiAlias,
+                                      child: (p.photoUrl?.isNotEmpty ==
+                                              true)
+                                          ? Image.network(
+                                              p.photoUrl!,
+                                              fit: BoxFit.cover,
+                                              width: double.infinity,
+                                              errorBuilder: (_, __,
+                                                      ___) =>
+                                                  const Center(
+                                                      child: Icon(
+                                                          Icons
+                                                              .coffee,
+                                                          size: 40,
+                                                          color:
+                                                              AppColors
+                                                                  .pri)),
+                                            )
+                                          : const Center(
+                                              child: Icon(
+                                                  Icons
+                                                      .coffee,
+                                                  size: 40,
+                                                  color: AppColors
+                                                      .pri)),
                                     ),
                                     if (out)
                                       Positioned(
