@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../core/theme.dart';
 import '../core/loading.dart';
 import '../core/store.dart';
+import '../core/offline.dart';
 
 
 
@@ -18,11 +20,23 @@ class _B extends ConsumerState<BayarTunaiScreen> {
   String method = 'Tunai';
   double paid = 50000;
   bool saving = false;
+  String orderType = 'takeaway';
+  final _mejaCtl = TextEditingController();
 
   @override
   Widget build(BuildContext context) {
+    // Paket dari keranjang: {total, disc, promo_id, promo_name, tax_pct}.
+    // Fallback hitung manual (tanpa promo, pajak 10%) kalau dibuka langsung.
+    final args = ModalRoute.of(context)?.settings.arguments;
     final ctl = ref.read(cartProvider.notifier);
-    final total = ctl.subtotal * 0.9 * 1.1; // HEMAT10 + pajak (sama dgn keranjang)
+    final pack = args is Map ? args : null;
+    final sub = ctl.subtotal;
+    final disc = ((pack?['disc'] as num?) ?? 0).toDouble();
+    final taxPct = ((pack?['tax_pct'] as num?) ?? 10).toDouble();
+    final total = pack != null
+        ? (((pack['total'] as num?) ?? 0).toDouble())
+        : (sub * (1 - 0) * (1 + taxPct / 100));
+    final tax = (sub - disc) * taxPct / 100;
     final change = paid - total;
     const methods = ['Tunai', 'QRIS', 'Debit', 'E-Wallet'];
     const icons = [Icons.payments, Icons.qr_code, Icons.credit_card, Icons.wallet];
@@ -59,7 +73,8 @@ class _B extends ConsumerState<BayarTunaiScreen> {
                   onTap: () {
                     setState(() => method = methods[i]);
                     if (method == 'QRIS') {
-                      Navigator.pushReplacementNamed(context, '/qris');
+                      Navigator.pushReplacementNamed(context, '/qris',
+                          arguments: args is Map ? args : null);
                     }
                   },
                   child: Center(
@@ -76,6 +91,32 @@ class _B extends ConsumerState<BayarTunaiScreen> {
                 ),
               )),
         ),
+        const SizedBox(height: 12),
+        const Text('TIPE ORDER',
+            style: TextStyle(fontWeight: FontWeight.w700)),
+        const SizedBox(height: 8),
+        Row(children: [
+          for (final t in ['dinein', 'takeaway', 'delivery'])
+            Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: ChoiceChip(
+                label: Text(t == 'dinein'
+                    ? 'Makan di sini'
+                    : t == 'takeaway'
+                        ? 'Bawa pulang'
+                        : 'Antar'),
+                selected: orderType == t,
+                onSelected: (_) => setState(() => orderType = t),
+              ),
+            ),
+        ]),
+        if (orderType == 'dinein') ...[
+          const SizedBox(height: 8),
+          TextField(controller: _mejaCtl,
+              decoration: const InputDecoration(
+                  labelText: 'No. meja (cth: A3)',
+                  border: OutlineInputBorder())),
+        ],
         const SizedBox(height: 12),
         const Text('UANG DITERIMA',
             style: TextStyle(fontWeight: FontWeight.w700)),
@@ -112,7 +153,32 @@ class _B extends ConsumerState<BayarTunaiScreen> {
                 : () async {
                     setState(() => saving = true);
                     try {
-                      await _save(method, total, paid, change, ref);
+                      final pack2 = args is Map ? args : null;
+                      // OFFLINE: internet mati -> antre lokal, sync nanti.
+                      final conn = await Connectivity()
+                          .checkConnectivity();
+                      final offline = conn.contains(ConnectivityResult.none);
+                      int earn = 0;
+                      if (offline) {
+                        await _queueOffline(ref,
+                            method: method,
+                            total: total, paid: paid, change: change,
+                            disc: disc, tax: tax,
+                            orderType: orderType,
+                            tableNo: _mejaCtl.text.trim().isEmpty
+                                ? null
+                                : _mejaCtl.text.trim());
+                      } else {
+                        earn = await _save(
+                            method, total, paid, change, ref,
+                            disc: disc,
+                            tax: tax,
+                            orderType: orderType,
+                            tableNo: _mejaCtl.text.trim().isEmpty
+                                ? null
+                                : _mejaCtl.text.trim(),
+                            promoName: (pack2?['promo_name'] ?? '').toString());
+                      }
                       if (context.mounted) {
                         Navigator.pushReplacementNamed(
                             context, '/sukses',
@@ -120,7 +186,12 @@ class _B extends ConsumerState<BayarTunaiScreen> {
                               'total': total,
                               'paid': paid,
                               'change': change,
-                              'method': method
+                              'method': method,
+                              'promo_name': (pack2?['promo_name'] ?? '').toString(),
+                              'order_type': orderType,
+                              'table_no': _mejaCtl.text.trim(),
+                              'earned_points': earn,
+                              'offline': offline,
                             });
                       }
                     } catch (e) {
@@ -142,8 +213,13 @@ class _B extends ConsumerState<BayarTunaiScreen> {
   }
 }
 
-Future<void> _save(String method, double total, double paid,
-    double change, WidgetRef ref) async {
+Future<int> _save(String method, double total, double paid,
+    double change, WidgetRef ref,
+    {required double disc,
+    required double tax,
+    required String orderType,
+    String? tableNo,
+    String promoName = ''}) async {
   final db = Supabase.instance.client;
   final cart = ref.read(cartProvider);
   final ctl = ref.read(cartProvider.notifier);
@@ -152,8 +228,6 @@ Future<void> _save(String method, double total, double paid,
   final shift = ref.read(shiftProvider);
   final cust = ref.read(customerProvider);
   final sub = ctl.subtotal;
-  final disc = sub * 0.10;
-  final tax = (sub - disc) * 0.10;
   final trx = await db.from('transactions').insert({
     'store_id': session.storeId,
     'shift_id': shift?['id'],
@@ -161,6 +235,8 @@ Future<void> _save(String method, double total, double paid,
     'code': '#${DateTime.now().millisecondsSinceEpoch % 100000}',
     'subtotal': sub, 'discount': disc, 'tax': tax, 'total': total,
     'pay_method': method, 'paid': paid, 'change': change,
+    'order_type': orderType,
+    if (tableNo != null) 'table_no': tableNo,
   }).select('id').single();
   for (final l in cart) {
     await db.from('transaction_items').insert({
@@ -182,7 +258,72 @@ Future<void> _save(String method, double total, double paid,
           .eq('id', l.product.id);
     } catch (_) {}
   }
+  // Poin member: 1 poin tiap kelipatan point_step dari total.
+  int earned = 0;
+  if (cust != null && cust['id'] != null) {
+    try {
+      final prof = await db.from('stores')
+          .select('point_step').eq('id', session.storeId).maybeSingle();
+      final step = (((prof?['point_step'] as num?) ?? 10000).toDouble());
+      if (step > 0 && total >= step) {
+        earned = (total ~/ step);
+        final curPts = await db.from('customers').select('points')
+            .eq('id', cust['id'] as String).maybeSingle();
+        final next = (((curPts?['points'] as num?) ?? 0).toInt()) + earned;
+        await db.from('customers')
+            .update({'points': next}).eq('id', cust['id'] as String);
+        await db.from('point_moves').insert({
+          'store_id': session.storeId,
+          'customer_id': cust['id'],
+          'transaction_id': trx['id'],
+          'points': earned,
+          'reason': 'earn',
+        });
+      }
+    } catch (_) {}
+  }
   ref.invalidate(productsProvider);
   ref.read(customerProvider.notifier).state = null;
   ctl.clear();
+  return earned;
+}
+
+/// Antrekan transaksi ke SQLite lokal (mode offline). Keranjang dikosongkan.
+Future<void> _queueOffline(WidgetRef ref,
+    {required String method,
+    required double total,
+    required double paid,
+    required double change,
+    required double disc,
+    required double tax,
+    required String orderType,
+    String? tableNo}) async {
+  final session = ref.read(sessionProvider);
+  if (session == null) throw StateError('Sesi habis — login ulang.');
+  final cart = ref.read(cartProvider);
+  final ctl = ref.read(cartProvider.notifier);
+  final shift = ref.read(shiftProvider);
+  final cust = ref.read(customerProvider);
+  if (cart.isEmpty) throw StateError('Keranjang kosong.');
+  await OfflineQueue.push(session.storeId, {
+    'shift_id': shift?['id'],
+    'customer_id': cust?['id'],
+    'code': '#${DateTime.now().millisecondsSinceEpoch % 100000}',
+    'subtotal': ctl.subtotal,
+    'discount': disc, 'tax': tax, 'total': total,
+    'pay_method': method, 'paid': paid, 'change': change,
+    'order_type': orderType,
+    if (tableNo != null) 'table_no': tableNo,
+    'lines': [
+      for (final l in cart)
+        {
+          'product_id': l.product.id, 'name': l.product.name,
+          'price': l.product.price, 'qty': l.qty,
+          'line_total': l.total,
+        }
+    ],
+  });
+  ref.read(customerProvider.notifier).state = null;
+  ctl.clear();
+  ref.invalidate(offlineCountProvider);
 }

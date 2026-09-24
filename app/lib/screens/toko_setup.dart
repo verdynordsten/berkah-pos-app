@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/store.dart';
 import '../core/theme.dart';
 import '../core/loading.dart';
+import 'kasir_setup.dart' show hashOwnerPin;
 
 // 03a Setup Toko (owner) — 2 mode:
 //  A. Punya session (normal): edit nama/alamat/telp/pajak. Simpan -> /kasir.
@@ -21,6 +22,8 @@ class _T extends ConsumerState<TokoSetupScreen> {
   final _addr = TextEditingController();
   final _phone = TextEditingController();
   final _tax = TextEditingController();
+  final _step = TextEditingController();
+  final _pval = TextEditingController();
   bool _busy = false;
   bool _loaded = false;
   String? _err;
@@ -33,6 +36,8 @@ class _T extends ConsumerState<TokoSetupScreen> {
     _addr.text = (row['address'] as String?) ?? '';
     _phone.text = (row['phone'] as String?) ?? '';
     _tax.text = '${row['tax_percent'] ?? 10}';
+    _step.text = '${row['point_step'] ?? 10000}';
+    _pval.text = '${row['point_value'] ?? 100}';
     setState(() => _loaded = true);
   }
 
@@ -70,11 +75,15 @@ class _T extends ConsumerState<TokoSetupScreen> {
     try {
       final db = ref.read(supabaseProvider);
       final tax = double.tryParse(_tax.text.replaceAll(',', '.')) ?? 10;
+      final step = double.tryParse(_step.text.replaceAll(',', '.')) ?? 10000;
+      final pval = double.tryParse(_pval.text.replaceAll(',', '.')) ?? 100;
       await db.from('stores').update({
         'name': _name.text.trim(),
         'address': _addr.text.trim(),
         'phone': _phone.text.trim(),
         'tax_percent': tax,
+        'point_step': step > 0 ? step : 10000,
+        'point_value': pval < 0 ? 0 : pval,
       }).eq('id', s.storeId);
       ref.read(sessionProvider.notifier).set(PosSession(
         kind: s.kind, storeId: s.storeId,
@@ -186,6 +195,27 @@ class _T extends ConsumerState<TokoSetupScreen> {
         TextField(controller: _tax, keyboardType: TextInputType.number,
             decoration: const InputDecoration(
                 hintText: '10', border: OutlineInputBorder())),
+        const SizedBox(height: 12),
+        const Text('Aturan poin member',
+            style: TextStyle(fontWeight: FontWeight.w600)),
+        const SizedBox(height: 6),
+        Row(children: [
+          Expanded(
+            child: TextField(controller: _step,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(
+                    labelText: 'Rp per 1 poin (cth: 10000)',
+                    border: OutlineInputBorder())),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: TextField(controller: _pval,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(
+                    labelText: 'Nilai 1 poin Rp (cth: 100)',
+                    border: OutlineInputBorder())),
+          ),
+        ]),
         if (_err != null) ...[
           const SizedBox(height: 8),
           Text(_err!, style: const TextStyle(color: Colors.red)),
@@ -200,7 +230,8 @@ class _T extends ConsumerState<TokoSetupScreen> {
 }
 
 /// Form bikin toko baru — dipakai kalau auth login VALID tapi membership
-/// toko belum ada (akun lama tanpa baris membership / RPC register gagal).
+/// toko belum ada (akun lama tanpa baris membership / RPC register gagal),
+/// ATAU owner nambah toko ke-2/3 (multi-outlet, arguments {'multi': true}).
 /// Isi nama toko + nama owner -> RPC create_store_with_owner (fallback:
 /// insert stores + memberships manual) -> langsung /pilih. Anti-loop.
 class _BuatTokoForm extends ConsumerStatefulWidget {
@@ -212,14 +243,20 @@ class _BuatTokoForm extends ConsumerStatefulWidget {
 class _BTF extends ConsumerState<_BuatTokoForm> {
   final _store = TextEditingController();
   final _name = TextEditingController(text: 'Owner');
+  final _pin = TextEditingController();
   bool _busy = false;
   String? _err;
 
   Future<void> _go() async {
     final store = _store.text.trim();
     final name = _name.text.trim().isEmpty ? 'Owner' : _name.text.trim();
+    final pin = _pin.text.trim();
     if (store.isEmpty) {
       setState(() => _err = 'Isi nama toko dulu.');
+      return;
+    }
+    if (pin.length != 6 || int.tryParse(pin) == null) {
+      setState(() => _err = 'PIN owner toko baru harus 6 digit angka.');
       return;
     }
     setState(() { _busy = true; _err = null; });
@@ -244,6 +281,12 @@ class _BTF extends ConsumerState<_BuatTokoForm> {
           'role': 'owner', 'display_name': name, 'is_active': true,
         }, onConflict: 'store_id,user_id');
       }
+      // Kunci PIN owner toko baru (konsisten: semua mode owner wajib PIN).
+      try {
+        final hp = hashOwnerPin(sid, u.id, pin);
+        await db.from('memberships').update({'pin_hash': hp})
+            .eq('user_id', u.id).eq('store_id', sid);
+      } catch (_) {}
       ref.read(sessionProvider.notifier).set(PosSession(
         kind: LoginKind.owner, storeId: sid, storeName: store,
         actorId: u.id, displayName: name, role: 'owner'));
@@ -278,6 +321,15 @@ class _BTF extends ConsumerState<_BuatTokoForm> {
         TextField(controller: _name,
             decoration: const InputDecoration(
                 hintText: 'cth: Verdy',
+                border: OutlineInputBorder())),
+        const SizedBox(height: 12),
+        const Text('PIN owner toko ini (6 digit)',
+            style: TextStyle(fontWeight: FontWeight.w600)),
+        const SizedBox(height: 6),
+        TextField(controller: _pin, obscureText: true,
+            keyboardType: TextInputType.number, maxLength: 6,
+            decoration: const InputDecoration(
+                hintText: 'cth: 123456',
                 border: OutlineInputBorder())),
         if (_err != null) ...[
           const SizedBox(height: 8),

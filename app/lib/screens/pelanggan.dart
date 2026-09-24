@@ -66,7 +66,11 @@ class _Pl extends ConsumerState<PelangganScreen> {
 
   void _pick(Map<String, dynamic>? c) {
     ref.read(customerProvider.notifier).state = c;
-    Navigator.pushNamed(context, '/tunai');
+    // Teruskan paket promo dari keranjang (Map) ke pembayaran.
+    // Fallback: double total lama -> dibungkus jadi Map.
+    final args = ModalRoute.of(context)?.settings.arguments;
+    final pack = args is Map ? args : {'total': (args is double ? args : 0.0)};
+    Navigator.pushNamed(context, '/tunai', arguments: pack);
   }
 
   @override

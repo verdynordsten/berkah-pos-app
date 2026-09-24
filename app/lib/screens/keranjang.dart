@@ -2,18 +2,65 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/theme.dart';
 import '../core/store.dart';
+import 'promo.dart' show bestPromo;
 
-// 07 Keranjang — list + promo + summary + lanjut bayar
-class KeranjangScreen extends ConsumerWidget {
+// 07 Keranjang — promo DINAMIS (terbaik otomatis) + pajak toko + preview poin.
+class KeranjangScreen extends ConsumerStatefulWidget {
   const KeranjangScreen({super.key});
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<KeranjangScreen> createState() => _Kr();
+}
+
+class _Kr extends ConsumerState<KeranjangScreen> {
+  Map<String, dynamic>? promo;
+  double taxPct = 10;
+  bool loadingPromo = true;
+  // Aturan poin toko.
+  double pointStep = 10000;
+  double pointValue = 100;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadPromo();
+  }
+
+  Future<void> _loadPromo() async {
+    final s = ref.read(sessionProvider);
+    if (s == null) {
+      if (mounted) setState(() => loadingPromo = false);
+      return;
+    }
+    final ctl = ref.read(cartProvider.notifier);
+    final db = ref.read(supabaseProvider);
+    try {
+      final p = await bestPromo(db, s.storeId, ctl.subtotal);
+      final prof = await db.from('stores').select('tax_percent,point_step,point_value')
+          .eq('id', s.storeId).maybeSingle();
+      if (mounted) {
+        setState(() {
+          promo = p;
+          taxPct = (((prof?['tax_percent'] as num?) ?? 10).toDouble());
+          pointStep = (((prof?['point_step'] as num?) ?? 10000).toDouble());
+          pointValue = (((prof?['point_value'] as num?) ?? 100).toDouble());
+          loadingPromo = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() => loadingPromo = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final cart = ref.watch(cartProvider);
     final ctl = ref.read(cartProvider.notifier);
     final sub = ctl.subtotal;
-    final disc = sub * 0.10; // HEMAT10
-    final tax = (sub - disc) * 0.10;
+    final disc = loadingPromo ? 0.0 : ((promo?['computed_disc'] as num?) ?? 0).toDouble();
+    final tax = (sub - disc) * taxPct / 100;
     final total = sub - disc + tax;
+    final cust = ref.watch(customerProvider);
+    final earnPts = total >= pointStep && pointStep > 0 ? (total ~/ pointStep) : 0;
     return Scaffold(
       appBar: AppBar(title: const Text('Keranjang')),
       body: Column(children: [
@@ -49,8 +96,10 @@ class KeranjangScreen extends ConsumerWidget {
                               IconButton(
                                 icon: const Icon(
                                     Icons.remove_circle_outline),
-                                onPressed: () =>
-                                    ctl.dec(l.product),
+                                onPressed: () {
+                                  ctl.dec(l.product);
+                                  _loadPromo();
+                                },
                               ),
                               Text('${l.qty}',
                                   style: const TextStyle(
@@ -59,8 +108,16 @@ class KeranjangScreen extends ConsumerWidget {
                                 icon: const Icon(
                                     Icons.add_circle_outline,
                                     color: AppColors.pri),
-                                onPressed: () =>
-                                    ctl.add(l.product),
+                                onPressed: () {
+                                  final ok = ctl.add(l.product);
+                                  if (!ok && context.mounted) {
+                                    ScaffoldMessenger.of(context)
+                                        .showSnackBar(SnackBar(
+                                            content: Text(
+                                                'Stok ${l.product.name} cuma ${l.product.stock}')));
+                                  }
+                                  _loadPromo();
+                                },
                               ),
                             ]),
                         onTap: () => Navigator.pushNamed(
@@ -80,9 +137,22 @@ class KeranjangScreen extends ConsumerWidget {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 Text('Subtotal ${rp(sub)}'),
-                Text('Promo HEMAT10 -${rp(disc)}',
-                    style: const TextStyle(color: AppColors.ok)),
-                Text('Pajak 10% ${rp(tax)}'),
+                if (loadingPromo)
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 4),
+                    child: SizedBox(height: 14,
+                        child: LinearProgressIndicator()),
+                  )
+                else if (promo != null)
+                  Text('Promo ${promo!['name']} -${rp(disc)}',
+                      style: const TextStyle(color: AppColors.ok))
+                else
+                  const Text('Tidak ada promo aktif',
+                      style: TextStyle(color: AppColors.mfg, fontSize: 12)),
+                Text('Pajak ${taxPct.toStringAsFixed(0)}% ${rp(tax)}'),
+                if (cust != null && earnPts > 0)
+                  Text('+ $earnPts poin untuk ${cust['name']} (≈${rp(earnPts * pointValue)})',
+                      style: const TextStyle(color: AppColors.ok, fontSize: 12)),
                 Text('Total ${rp(total)}',
                     style: const TextStyle(
                         fontSize: 17, fontWeight: FontWeight.w700)),
@@ -92,7 +162,13 @@ class KeranjangScreen extends ConsumerWidget {
                         ? null
                         : () => Navigator.pushNamed(
                             context, '/pelanggan',
-                            arguments: total),
+                            arguments: {
+                              'total': total,
+                              'disc': disc,
+                              'promo_id': promo?['id'],
+                              'promo_name': promo?['name'],
+                              'tax_pct': taxPct,
+                            }),
                     child: const Text('Lanjut ke Pembayaran')),
               ]),
         ),

@@ -212,6 +212,48 @@ class LainnyaScreen extends ConsumerWidget {
         if (s?.canManageMenu == true) ...[
           Card(
             child: ListTile(
+              leading: const Icon(Icons.bar_chart,
+                  color: AppColors.pri),
+              title: const Text('Laporan Usaha'),
+              subtitle: const Text('Omzet, terlaris, rekap kasir'),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () =>
+                  Navigator.pushNamed(context, '/laporan'),
+            ),
+          ),
+          Card(
+            child: ListTile(
+              leading: const Icon(Icons.discount,
+                  color: AppColors.pri),
+              title: const Text('Promo & Diskon'),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () =>
+                  Navigator.pushNamed(context, '/promo'),
+            ),
+          ),
+          Card(
+            child: ListTile(
+              leading: const Icon(Icons.warehouse,
+                  color: AppColors.pri),
+              title: const Text('Kelola Stok'),
+              subtitle: const Text('Menipis, riwayat, pembelian'),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () =>
+                  Navigator.pushNamed(context, '/stok'),
+            ),
+          ),
+          Card(
+            child: ListTile(
+              leading: const Icon(Icons.account_balance_wallet,
+                  color: AppColors.pri),
+              title: const Text('Kas & Keuangan'),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () =>
+                  Navigator.pushNamed(context, '/kas'),
+            ),
+          ),
+          Card(
+            child: ListTile(
               leading: const Icon(Icons.inventory_2,
                   color: AppColors.pri),
               title: const Text('Tambah Produk'),
@@ -225,6 +267,7 @@ class LainnyaScreen extends ConsumerWidget {
               leading:
                   const Icon(Icons.group, color: AppColors.pri),
               title: const Text('Kelola Kasir'),
+              subtitle: const Text('PIN, peran, komisi %'),
               trailing: const Icon(Icons.chevron_right),
               onTap: () =>
                   Navigator.pushNamed(context, '/kasir'),
@@ -235,11 +278,25 @@ class LainnyaScreen extends ConsumerWidget {
               leading:
                   const Icon(Icons.store, color: AppColors.pri),
               title: const Text('Setup Toko'),
+              subtitle: const Text('Nama, pajak %, aturan poin'),
               trailing: const Icon(Icons.chevron_right),
               onTap: () =>
                   Navigator.pushNamed(context, '/toko'),
             ),
           ),
+          if (s?.kind == LoginKind.owner) ...[
+            Card(
+              child: ListTile(
+                leading: const Icon(Icons.storefront,
+                    color: AppColors.pri),
+                title: const Text('Ganti Toko'),
+                subtitle: const Text('Multi-outlet 1 akun'),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => Navigator.pushNamedAndRemoveUntil(
+                    context, '/toko_list', (_) => false),
+              ),
+            ),
+          ],
         ],
         Card(
           child: ListTile(

@@ -39,7 +39,7 @@ class _S extends ConsumerState<SplashScreen> {
             displayName: (mem['display_name'] as String?) ?? 'Owner',
             role: (mem['role'] as String?) ?? 'staff'));
           if (!mounted) return;
-          Navigator.pushReplacementNamed(context, '/pilih');
+          Navigator.pushReplacementNamed(context, '/toko_list');
           return;
         }
       }

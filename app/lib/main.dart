@@ -20,6 +20,11 @@ import 'screens/pelanggan.dart';
 import 'screens/bayar_tunai.dart';
 import 'screens/bayar_qris.dart';
 import 'screens/sukses.dart';
+import 'screens/pilih_toko.dart';
+import 'screens/laporan.dart';
+import 'screens/promo.dart';
+import 'screens/stok.dart';
+import 'screens/kas.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -69,6 +74,11 @@ class BerkahPos extends StatelessWidget {
         '/produk_baru': (_) => const ProdukFormScreen(),
         '/riwayat': (_) => const RiwayatScreen(),
         '/lainnya': (_) => const LainnyaScreen(),
+        '/toko_list': (_) => const PilihTokoScreen(),
+        '/laporan': (_) => const LaporanScreen(),
+        '/promo': (_) => const PromoScreen(),
+        '/stok': (_) => const StokScreen(),
+        '/kas': (_) => const KasScreen(),
       },
     );
   }

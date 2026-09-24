@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/theme.dart';
 import '../core/store.dart';
+import '../core/offline.dart';
 
 // 05 Katalog — grid produk + search + tab bar (inti kasir)
 class KatalogScreen extends ConsumerStatefulWidget {
@@ -13,6 +14,36 @@ class KatalogScreen extends ConsumerStatefulWidget {
 class _K extends ConsumerState<KatalogScreen> {
   String cat = 'Semua';
   String q = '';
+  bool _syncing = false;
+
+  /// Sync otomatis sekali saat layar dibuka & online.
+  Future<void> _autoSync() async {
+    final s = ref.read(sessionProvider);
+    if (s == null || _syncing) return;
+    final conn = ref.read(connectivityProvider).valueOrNull;
+    if (conn != true) return;
+    _syncing = true;
+    try {
+      final n = await OfflineQueue.count();
+      if (n == 0) return;
+      final res =
+          await syncOfflineQueue(ref.read(supabaseProvider), s.storeId);
+      ref.invalidate(offlineCountProvider);
+      if (mounted && res.$1 > 0) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text('${res.$1} transaksi offline terkirim.')));
+      }
+    } catch (_) {
+    } finally {
+      _syncing = false;
+    }
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    Future.microtask(_autoSync);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -51,6 +82,40 @@ class _K extends ConsumerState<KatalogScreen> {
               backgroundColor: AppColors.mut,
               child: Icon(Icons.store, color: AppColors.pri)),
         ),
+        actions: [
+          // Badge antrean offline + tombol sync manual.
+          Consumer(builder: (_, ref2, __) {
+            final off = ref2.watch(offlineCountProvider).valueOrNull ?? 0;
+            final online =
+                ref2.watch(connectivityProvider).valueOrNull ?? true;
+            if (off == 0 && online) return const SizedBox.shrink();
+            return Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: ActionChip(
+                avatar: Icon(
+                    online ? Icons.cloud_upload : Icons.cloud_off,
+                    size: 16,
+                    color: online ? AppColors.ok : AppColors.warn),
+                label: Text(online ? 'Sync $off' : 'Offline $off'),
+                onPressed: online
+                    ? () async {
+                        final s = ref.read(sessionProvider);
+                        if (s == null) return;
+                        final res = await syncOfflineQueue(
+                            ref.read(supabaseProvider), s.storeId);
+                        ref.invalidate(offlineCountProvider);
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                  content: Text(
+                                      '${res.$1} terkirim, ${res.$2} gagal.')));
+                        }
+                      }
+                    : null,
+              ),
+            );
+          }),
+        ],
       ),
       body: Column(children: [
         Padding(

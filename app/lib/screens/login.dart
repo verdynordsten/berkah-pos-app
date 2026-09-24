@@ -54,8 +54,8 @@ class _L extends ConsumerState<LoginScreen> {
         displayName: (mem['display_name'] as String?) ?? 'Owner',
         role: (mem['role'] as String?) ?? 'staff'));
       if (mounted) {
-        // Login sukses -> pilih mau jualan sebagai siapa -> shift -> dashboard.
-        Navigator.pushReplacementNamed(context, '/pilih');
+        // Login sukses -> pilih toko dulu (multi-outlet) -> pilih user -> shift.
+        Navigator.pushReplacementNamed(context, '/toko_list');
       }
     } on AuthException catch (e) {
       setState(() => _err = e.message);

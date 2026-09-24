@@ -23,6 +23,7 @@ class _PF extends ConsumerState<ProdukFormScreen> {
   final _price = TextEditingController();
   final _stock = TextEditingController();
   final _barcode = TextEditingController();
+  final _low = TextEditingController();
   String? _catId;
   bool _busy = false;
   String? _err;
@@ -40,6 +41,7 @@ class _PF extends ConsumerState<ProdukFormScreen> {
       _name.text = (e['name'] as String?) ?? '';
       _price.text = '${(e['price'] as num?) ?? 0}';
       _stock.text = '${(e['stock'] as int?) ?? 0}';
+      _low.text = '${(e['low_stock_at'] as num?) ?? 5}';
       _barcode.text = (e['barcode'] as String?) ?? '';
       _catId = e['category_id'] as String?;
       _fotoUrlLama = e['photo_url'] as String?;
@@ -360,6 +362,8 @@ class _PF extends ConsumerState<ProdukFormScreen> {
         'barcode': _barcode.text.trim().isEmpty
             ? null
             : _barcode.text.trim(),
+        'low_stock_at':
+            int.tryParse(_low.text.replaceAll('.', '')) ?? 5,
         'photo_url': photoUrl,
         'is_active': true,
       };
@@ -542,6 +546,14 @@ class _PF extends ConsumerState<ProdukFormScreen> {
                         hintText: '50', border: OutlineInputBorder())),
               ])),
         ]),
+        const SizedBox(height: 12),
+        const Text('Ambang stok menipis (peringatan)',
+            style: TextStyle(fontWeight: FontWeight.w600)),
+        const SizedBox(height: 6),
+        TextField(controller: _low,
+            keyboardType: TextInputType.number,
+            decoration: const InputDecoration(
+                hintText: '5', border: OutlineInputBorder())),
         const SizedBox(height: 12),
         const Text('Barcode (opsional)',
             style: TextStyle(fontWeight: FontWeight.w600)),

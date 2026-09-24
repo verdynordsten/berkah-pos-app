@@ -49,6 +49,8 @@ class _K extends ConsumerState<KasirSetupScreen> {
         TextEditingController(text: (existing?['name'] as String?) ?? '');
     final pinCtl = TextEditingController();
     String role = isEdit ? _roleOf(existing) : 'kasir';
+    final komCtl = TextEditingController(
+        text: ((existing?['commission_pct'] as num?) ?? 0).toString());
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => StatefulBuilder(
@@ -82,6 +84,13 @@ class _K extends ConsumerState<KasirSetupScreen> {
                         ? 'PIN baru 6 digit (kosongkan = tidak ganti)'
                         : 'PIN 6 digit',
                     border: const OutlineInputBorder())),
+            const SizedBox(height: 12),
+            TextField(controller: komCtl,
+                keyboardType:
+                    const TextInputType.numberWithOptions(decimal: true),
+                decoration: const InputDecoration(
+                    labelText: 'Komisi % (cth: 2 = 2% dari omzet)',
+                    border: OutlineInputBorder())),
           ]),
           actions: [
             TextButton(onPressed: () => Navigator.pop(ctx, false),
@@ -113,17 +122,20 @@ class _K extends ConsumerState<KasirSetupScreen> {
     }
     try {
       final db = ref.read(supabaseProvider);
+      final kom = double.tryParse(komCtl.text.replaceAll(',', '.')) ?? 0;
       if (!isEdit) {
         await db.from('staff').insert({
           'store_id': storeId,
           'name': name,
           'role': role,
           'pin_hash': hashPin(storeId, name, pin),
+          'commission_pct': kom < 0 ? 0 : kom,
         });
       } else {
         final payload = <String, dynamic>{
           'name': name,
           'role': role,
+          'commission_pct': kom < 0 ? 0 : kom,
         };
         if (pin.isNotEmpty) {
           payload['pin_hash'] = hashPin(storeId, name, pin);

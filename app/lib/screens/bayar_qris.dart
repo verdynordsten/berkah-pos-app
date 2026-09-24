@@ -46,7 +46,7 @@ class _Q extends ConsumerState<BayarQrisScreen> {
     return '$m:$s';
   }
 
-  Future<void> _confirm(double total) async {
+  Future<void> _confirm(double total, Map? pack) async {
     setState(() => _saving = true);
     try {
       final db = Supabase.instance.client;
@@ -57,8 +57,9 @@ class _Q extends ConsumerState<BayarQrisScreen> {
       final shift = ref.read(shiftProvider);
       final cust = ref.read(customerProvider);
       final sub = ctl.subtotal;
-      final disc = sub * 0.10;
-      final tax = (sub - disc) * 0.10;
+      final disc = ((pack?['disc'] as num?) ?? 0).toDouble();
+      final taxPct = ((pack?['tax_pct'] as num?) ?? 10).toDouble();
+      final tax = (sub - disc) * taxPct / 100;
       final trx = await db.from('transactions').insert({
         'store_id': session.storeId,
         'shift_id': shift?['id'],
@@ -66,6 +67,7 @@ class _Q extends ConsumerState<BayarQrisScreen> {
         'code': '#${DateTime.now().millisecondsSinceEpoch % 100000}',
         'subtotal': sub, 'discount': disc, 'tax': tax, 'total': total,
         'pay_method': 'QRIS', 'paid': total, 'change': 0,
+        'order_type': 'takeaway',
       }).select('id').single();
       for (final l in cart) {
         await db.from('transaction_items').insert({
@@ -92,7 +94,9 @@ class _Q extends ConsumerState<BayarQrisScreen> {
       if (mounted) {
         Navigator.pushReplacementNamed(context, '/sukses', arguments: {
           'total': total, 'paid': total,
-          'change': 0.0, 'method': 'QRIS'
+          'change': 0.0, 'method': 'QRIS',
+          'promo_name': ((pack?['promo_name'] ?? '').toString()),
+          'order_type': 'takeaway', 'table_no': '', 'earned_points': 0,
         });
       }
     } catch (e) {
@@ -111,9 +115,13 @@ class _Q extends ConsumerState<BayarQrisScreen> {
     final cart = ref.watch(cartProvider);
     final ctl = ref.read(cartProvider.notifier);
     final sub = ctl.subtotal;
-    final total = args is double
-        ? args
-        : sub - sub * 0.10 + (sub - sub * 0.10) * 0.10;
+    // Paket dari tunai/keranjang (Map) atau double legacy.
+    final pack = args is Map ? args : null;
+    final total = pack != null
+        ? (((pack['total'] as num?) ?? 0).toDouble())
+        : args is double
+            ? args
+            : sub * 1.1;
     final expired = _left <= 0;
     return Scaffold(
       appBar: AppBar(title: const Text('Pembayaran QRIS')),
@@ -189,7 +197,7 @@ class _Q extends ConsumerState<BayarQrisScreen> {
         FilledButton(
             onPressed: expired || _saving
                 ? null
-                : () => _confirm(total),
+                : () => _confirm(total, pack),
             child: _saving
                 ? const BusyLabel('Menyimpan')
                 : const Text('Saya Sudah Bayar')),
