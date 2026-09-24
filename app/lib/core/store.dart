@@ -88,6 +88,28 @@ class SessionCtl extends StateNotifier<PosSession?> {
   void clear() => state = null;
 }
 
+/// Pulihkan sesi owner dari Supabase Auth yang masih tersimpan di device.
+/// Dipakai layar mana pun kalau sessionProvider (in-memory) hilang tapi
+/// auth Supabase masih ada — mis. habis restart app / hot-restart /
+/// nyasar ke route tanpa sesi. Return null kalau: belum login sama sekali,
+/// atau user auth ada tapi belum punya membership toko.
+Future<PosSession?> restoreOwnerSession(SupabaseClient db) async {
+  final u = db.auth.currentUser;
+  if (u == null) return null;
+  final mem = await db.from('memberships').select().eq('user_id', u.id)
+      .eq('is_active', true).order('created_at').limit(1).maybeSingle();
+  if (mem == null) return null;
+  final store = await db.from('stores').select()
+      .eq('id', mem['store_id'] as String).maybeSingle();
+  return PosSession(
+    kind: LoginKind.owner,
+    storeId: mem['store_id'] as String,
+    storeName: (store?['name'] as String?) ?? 'Toko',
+    actorId: u.id,
+    displayName: (mem['display_name'] as String?) ?? 'Owner',
+    role: (mem['role'] as String?) ?? 'staff');
+}
+
 final sessionProvider = StateNotifierProvider<SessionCtl, PosSession?>((ref) => SessionCtl());
 
 final productsProvider = FutureProvider<List<Product>>((ref) async {

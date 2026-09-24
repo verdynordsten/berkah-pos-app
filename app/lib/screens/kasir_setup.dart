@@ -178,8 +178,26 @@ class _K extends ConsumerState<KasirSetupScreen> {
   Widget build(BuildContext context) {
     final s = ref.watch(sessionProvider);
     if (s == null) {
-      return const Scaffold(
-          body: Center(child: Text('Belum login. Kembali & masuk dulu.')));
+      return Scaffold(
+        appBar: AppBar(title: const Text('Kelola Kasir')),
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(32),
+            child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Text('Sesi habis. Masuk lagi dulu ya.',
+                      textAlign: TextAlign.center),
+                  const SizedBox(height: 16),
+                  FilledButton(
+                    onPressed: () => Navigator.pushNamedAndRemoveUntil(
+                        context, '/login', (_) => false),
+                    child: const Text('Ke Halaman Masuk'),
+                  ),
+                ]),
+          ),
+        ),
+      );
     }
     // KUNCI: kasir tidak boleh kelola user lain.
     if (!s.canManageMenu) {

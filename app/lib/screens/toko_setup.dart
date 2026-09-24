@@ -31,6 +31,21 @@ class _T extends ConsumerState<TokoSetupScreen> {
     setState(() => _loaded = true);
   }
 
+  /// Coba pulihkan sesi dari auth Supabase yang tersimpan di device.
+  /// Return true kalau berhasil (navigasi ke /pilih), false kalau memang
+  /// belum login / belum punya toko (tampilkan tombol ke /login).
+  Future<bool> _restore() async {
+    try {
+      final s = await restoreOwnerSession(ref.read(supabaseProvider));
+      if (s == null) return false;
+      ref.read(sessionProvider.notifier).set(s);
+      if (mounted) Navigator.pushReplacementNamed(context, '/pilih');
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
   Future<void> _save() async {
     final s = ref.read(sessionProvider);
     if (s == null) return;
@@ -66,8 +81,42 @@ class _T extends ConsumerState<TokoSetupScreen> {
   Widget build(BuildContext context) {
     final s = ref.watch(sessionProvider);
     if (s == null) {
-      return const Scaffold(
-          body: Center(child: Text('Belum login. Kembali & masuk dulu.')));
+      // Sesi in-memory hilang (mis. habis restart app) tapi auth Supabase
+      // mungkin masih ada -> coba pulihkan otomatis, jangan dead-end.
+      return FutureBuilder(
+        future: _restore(),
+        builder: (_, snap) {
+          if (snap.connectionState == ConnectionState.waiting) {
+            return const Scaffold(
+                body: Center(child: CircularProgressIndicator()));
+          }
+          if (snap.data == true) {
+            return const Scaffold(
+                body: Center(child: CircularProgressIndicator()));
+          }
+          return Scaffold(
+            appBar: AppBar(title: const Text('Setup Toko')),
+            body: Center(
+              child: Padding(
+                padding: const EdgeInsets.all(32),
+                child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Text(
+                          'Sesi habis. Masuk lagi dulu ya.',
+                          textAlign: TextAlign.center),
+                      const SizedBox(height: 16),
+                      FilledButton(
+                        onPressed: () => Navigator.pushNamedAndRemoveUntil(
+                            context, '/login', (_) => false),
+                        child: const Text('Ke Halaman Masuk'),
+                      ),
+                    ]),
+              ),
+            ),
+          );
+        },
+      );
     }
     if (!_loaded) _load(s.storeId);
     return Scaffold(

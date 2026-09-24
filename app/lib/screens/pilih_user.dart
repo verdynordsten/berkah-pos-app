@@ -27,7 +27,19 @@ class _PU extends ConsumerState<PilihUserScreen> {
   }
 
   Future<void> _load() async {
-    final s = ref.read(sessionProvider);
+    var s = ref.read(sessionProvider);
+    if (s == null) {
+      // Sesi in-memory hilang tapi auth Supabase mungkin masih ada
+      // (habis restart app) -> pulihkan otomatis biar tidak dead-end.
+      try {
+        final restored =
+            await restoreOwnerSession(ref.read(supabaseProvider));
+        if (restored != null) {
+          ref.read(sessionProvider.notifier).set(restored);
+          s = restored;
+        }
+      } catch (_) {}
+    }
     if (s == null) {
       if (mounted) {
         setState(() { _loading = false; _err = 'Belum login.'; });
@@ -166,7 +178,23 @@ class _PU extends ConsumerState<PilihUserScreen> {
     if (s == null) {
       return Scaffold(
         appBar: AppBar(title: const Text('Pilih Pengguna')),
-        body: Center(child: Text(_err ?? 'Belum login. Kembali & masuk dulu.')),
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(32),
+            child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(_err ?? 'Sesi habis. Masuk lagi dulu ya.',
+                      textAlign: TextAlign.center),
+                  const SizedBox(height: 16),
+                  FilledButton(
+                    onPressed: () => Navigator.pushNamedAndRemoveUntil(
+                        context, '/login', (_) => false),
+                    child: const Text('Ke Halaman Masuk'),
+                  ),
+                ]),
+          ),
+        ),
       );
     }
     final isPrivileged = s.canManageMenu;
