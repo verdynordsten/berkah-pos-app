@@ -59,7 +59,16 @@ class _Sh extends ConsumerState<ShiftScreen> {
     ];
     final s = ref.watch(sessionProvider);
     return Scaffold(
-      appBar: AppBar(title: const Text('Pilih Shift')),
+      appBar: AppBar(
+        title: const Text('Pilih Shift'),
+        actions: [
+          IconButton(
+            tooltip: 'Ganti pengguna',
+            icon: const Icon(Icons.switch_account),
+            onPressed: () => Navigator.pushNamed(context, '/pilih'),
+          ),
+        ],
+      ),
       body: ListView(padding: const EdgeInsets.all(16), children: [
         if (s != null)
           Text('Halo, ${s.displayName} — ${s.storeName}',

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/store.dart';
 import '../core/theme.dart';
+import '../core/bottom_nav.dart';
 
 import 'kasir_setup.dart' show hashPin, hashOwnerPin;
 
@@ -176,6 +177,7 @@ class LainnyaScreen extends ConsumerWidget {
     final sh = ref.watch(shiftProvider);
     return Scaffold(
       appBar: AppBar(title: const Text('Lainnya')),
+      bottomNavigationBar: const PosBottomNav(current: 3),
       body: ListView(padding: const EdgeInsets.all(16), children: [
         Card(
           child: ListTile(
@@ -196,7 +198,7 @@ class LainnyaScreen extends ConsumerWidget {
             subtitle: const Text('Switch kasir / admin / owner (wajib PIN)'),
             trailing: const Icon(Icons.chevron_right),
             onTap: () =>
-                Navigator.pushReplacementNamed(context, '/pilih'),
+                Navigator.pushNamed(context, '/pilih'),
           ),
         ),
         Card(

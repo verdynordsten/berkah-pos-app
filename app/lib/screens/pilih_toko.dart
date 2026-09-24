@@ -67,7 +67,23 @@ class _PT extends ConsumerState<PilihTokoScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Pilih Toko')),
+      appBar: AppBar(
+        title: const Text('Pilih Toko'),
+        actions: [
+          IconButton(
+            tooltip: 'Keluar',
+            icon: const Icon(Icons.logout),
+            onPressed: () async {
+              await ref.read(supabaseProvider).auth.signOut();
+              ref.read(sessionProvider.notifier).clear();
+              if (context.mounted) {
+                Navigator.pushNamedAndRemoveUntil(
+                    context, '/login', (_) => false);
+              }
+            },
+          ),
+        ],
+      ),
       body: loading
           ? const AppLoader(label: 'Memuat toko')
           : err != null

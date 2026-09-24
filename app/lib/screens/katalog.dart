@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/theme.dart';
 import '../core/store.dart';
 import '../core/offline.dart';
+import '../core/bottom_nav.dart';
 
 // 05 Katalog — grid produk + search + tab bar (inti kasir)
 class KatalogScreen extends ConsumerStatefulWidget {
@@ -407,33 +408,7 @@ class _K extends ConsumerState<KatalogScreen> {
               child: const Icon(Icons.add),
             )
           : null,
-      bottomNavigationBar: BottomNavigationBar(
-        type: BottomNavigationBarType.fixed,
-        currentIndex: 0,
-        selectedItemColor: AppColors.pri,
-        unselectedItemColor: AppColors.mfg,
-        selectedFontSize: 11,
-        unselectedFontSize: 11,
-        onTap: (i) {
-          if (i == 1) {
-            Navigator.pushNamed(context, '/keranjang');
-          } else if (i == 2) {
-            Navigator.pushNamed(context, '/riwayat');
-          } else if (i == 3) {
-            Navigator.pushNamed(context, '/lainnya');
-          }
-        },
-        items: const [
-          BottomNavigationBarItem(
-              icon: Icon(Icons.home), label: 'Beranda'),
-          BottomNavigationBarItem(
-              icon: Icon(Icons.shopping_cart), label: 'Keranjang'),
-          BottomNavigationBarItem(
-              icon: Icon(Icons.receipt), label: 'Riwayat'),
-          BottomNavigationBarItem(
-              icon: Icon(Icons.settings), label: 'Lainnya'),
-        ],
-      ),
+      bottomNavigationBar: const PosBottomNav(current: 0),
     );
   }
 }

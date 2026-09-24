@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/theme.dart';
 import '../core/store.dart';
+import '../core/bottom_nav.dart';
 import 'promo.dart' show bestPromo;
 
 // 07 Keranjang — promo DINAMIS (terbaik otomatis) + pajak toko + preview poin.
@@ -63,6 +64,7 @@ class _Kr extends ConsumerState<KeranjangScreen> {
     final earnPts = total >= pointStep && pointStep > 0 ? (total ~/ pointStep) : 0;
     return Scaffold(
       appBar: AppBar(title: const Text('Keranjang')),
+      bottomNavigationBar: const PosBottomNav(current: 1),
       body: Column(children: [
         Expanded(
           child: cart.isEmpty

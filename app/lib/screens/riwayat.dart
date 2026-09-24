@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/store.dart';
 import '../core/theme.dart';
 import '../core/loading.dart';
+import '../core/bottom_nav.dart';
 
 // 12 Riwayat Transaksi — list transaksi toko aktif (terbaru dulu).
 // Tap item -> detail item + total.
@@ -13,6 +14,7 @@ class RiwayatScreen extends ConsumerWidget {
     final s = ref.watch(sessionProvider);
     return Scaffold(
       appBar: AppBar(title: const Text('Riwayat Transaksi')),
+      bottomNavigationBar: const PosBottomNav(current: 2),
       body: s == null
           ? const Center(child: Text('Belum login.'))
           : FutureBuilder(

@@ -297,9 +297,16 @@ class _K extends ConsumerState<KasirSetupScreen> {
               label: const Text('Tambah Kasir')),
             const SizedBox(height: 12),
             FilledButton(
-                onPressed: () =>
-                    Navigator.pushReplacementNamed(context, '/pilih'),
-                child: const Text('Selesai — Pilih Pengguna')),
+                onPressed: () {
+                  // Datang via push (Lainnya/Pilih User): cukup back.
+                  // Datang via replace (alur register): tidak bisa pop -> ke /pilih.
+                  if (Navigator.canPop(context)) {
+                    Navigator.pop(context);
+                  } else {
+                    Navigator.pushReplacementNamed(context, '/pilih');
+                  }
+                },
+                child: const Text('Selesai — Kembali')),
           ]);
         },
       ),

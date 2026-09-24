@@ -90,7 +90,17 @@ class _T extends ConsumerState<TokoSetupScreen> {
         storeName: _name.text.trim().isEmpty ? s.storeName : _name.text.trim(),
         actorId: s.actorId, displayName: s.displayName, role: s.role));
       ref.invalidate(storeProfileProvider);
-      if (mounted) Navigator.pushReplacementNamed(context, '/kasir');
+      if (mounted) {
+        // Dari Lainnya (push): cukup back. Dari alur register (replace,
+        // tidak bisa pop): lanjut ke /kasir.
+        if (Navigator.canPop(context)) {
+          Navigator.pop(context);
+          ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Toko disimpan.')));
+        } else {
+          Navigator.pushReplacementNamed(context, '/kasir');
+        }
+      }
     } catch (e) {
       setState(() => _err = '$e');
     } finally {
@@ -298,8 +308,30 @@ class _BTF extends ConsumerState<_BuatTokoForm> {
 
   @override
   Widget build(BuildContext context) {
+    final args = ModalRoute.of(context)?.settings.arguments;
+    // Mode multi-outlet (dari Pilih Toko > Tambah Toko): ada tombol back
+    // otomatis (push) + judul beda. Mode anti-loop (dari login): tidak ada
+    // back, tapi ada tombol keluar biar tidak kejebak.
+    final isMulti = args is Map && args['multi'] == true;
     return Scaffold(
-      appBar: AppBar(title: const Text('Buat Toko')),
+      appBar: AppBar(
+        title: Text(isMulti ? 'Tambah Toko Baru' : 'Buat Toko'),
+        actions: [
+          if (!isMulti)
+            IconButton(
+              tooltip: 'Keluar',
+              icon: const Icon(Icons.logout),
+              onPressed: () async {
+                await ref.read(supabaseProvider).auth.signOut();
+                ref.read(sessionProvider.notifier).clear();
+                if (context.mounted) {
+                  Navigator.pushNamedAndRemoveUntil(
+                      context, '/login', (_) => false);
+                }
+              },
+            ),
+        ],
+      ),
       body: ListView(padding: const EdgeInsets.all(16), children: [
         const Text('Login berhasil, tapi akun ini belum punya toko.',
             style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
