@@ -4,6 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../core/theme.dart';
 import '../core/store.dart';
 import 'shift.dart' show shiftProvider;
+import 'pelanggan.dart' show customerProvider;
 
 // 09 Bayar Tunai — metode + denom + kembalian + simpan ke Supabase
 class BayarTunaiScreen extends ConsumerStatefulWidget {
@@ -147,12 +148,14 @@ Future<void> _save(String method, double total, double paid,
   final session = ref.read(sessionProvider);
   if (session == null) throw StateError('Sesi habis — login ulang.');
   final shift = ref.read(shiftProvider);
+  final cust = ref.read(customerProvider);
   final sub = ctl.subtotal;
   final disc = sub * 0.10;
   final tax = (sub - disc) * 0.10;
   final trx = await db.from('transactions').insert({
     'store_id': session.storeId,
     'shift_id': shift?['id'],
+    'customer_id': cust?['id'],
     'code': '#${DateTime.now().millisecondsSinceEpoch % 100000}',
     'subtotal': sub, 'discount': disc, 'tax': tax, 'total': total,
     'pay_method': method, 'paid': paid, 'change': change,
@@ -178,5 +181,6 @@ Future<void> _save(String method, double total, double paid,
     } catch (_) {}
   }
   ref.invalidate(productsProvider);
+  ref.read(customerProvider.notifier).state = null;
   ctl.clear();
 }

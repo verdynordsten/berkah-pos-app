@@ -42,11 +42,30 @@ class KeranjangScreen extends ConsumerWidget {
                             style: const TextStyle(
                                 fontWeight: FontWeight.w700)),
                         subtitle: Text(
-                            '${rp(l.product.price)} /pcs x${l.qty}'),
-                        trailing: Text(rp(l.total),
-                            style: const TextStyle(
-                                fontWeight: FontWeight.w700)),
-                        onTap: () {},
+                            '${rp(l.product.price)} /pcs'),
+                        trailing: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              IconButton(
+                                icon: const Icon(
+                                    Icons.remove_circle_outline),
+                                onPressed: () =>
+                                    ctl.dec(l.product),
+                              ),
+                              Text('${l.qty}',
+                                  style: const TextStyle(
+                                      fontWeight: FontWeight.w700)),
+                              IconButton(
+                                icon: const Icon(
+                                    Icons.add_circle_outline,
+                                    color: AppColors.pri),
+                                onPressed: () =>
+                                    ctl.add(l.product),
+                              ),
+                            ]),
+                        onTap: () => Navigator.pushNamed(
+                            context, '/detail',
+                            arguments: l.product.id),
                       ),
                     );
                   },

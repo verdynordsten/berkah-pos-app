@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/store.dart';
-import '../core/theme.dart';
 
 // 05b Tambah/Edit Produk (owner) — nama + kategori + harga + stok + barcode.
 // Simpan -> products (store aktif) -> kembali + refresh katalog.

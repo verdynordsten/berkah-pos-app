@@ -114,6 +114,7 @@ class _K extends ConsumerState<KatalogScreen> {
                   final p = f[i];
                   return Card(
                     child: InkWell(
+                      // Tap = tambah cepat. Tahan = detail / edit.
                       onTap: () {
                         ref.read(cartProvider.notifier).add(p);
                         ScaffoldMessenger.of(context).showSnackBar(
@@ -122,6 +123,9 @@ class _K extends ConsumerState<KatalogScreen> {
                                 duration:
                                     const Duration(milliseconds: 600)));
                       },
+                      onLongPress: () => Navigator.pushNamed(
+                          context, '/detail',
+                          arguments: p.id),
                       child: Padding(
                         padding: const EdgeInsets.all(10),
                         child: Column(
