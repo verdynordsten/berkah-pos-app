@@ -100,6 +100,60 @@ class _K extends ConsumerState<KatalogScreen> {
                               .toLowerCase()
                               .contains(q.toLowerCase())))
                   .toList();
+              if (f.isEmpty) {
+                final isOwnerNow = session?.isOwner == true;
+                return Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(32),
+                    child: Column(
+                        mainAxisAlignment:
+                            MainAxisAlignment.center,
+                        children: [
+                          Container(
+                            width: 96, height: 96,
+                            decoration: BoxDecoration(
+                                color: AppColors.mut,
+                                borderRadius:
+                                    BorderRadius.circular(28)),
+                            child: const Icon(
+                                Icons.coffee,
+                                size: 48,
+                                color: AppColors.pri),
+                          ),
+                          const SizedBox(height: 16),
+                          Text(
+                              q.isNotEmpty
+                                  ? 'Tidak ketemu "$q"'
+                                  : 'Katalog masih kosong',
+                              style: const TextStyle(
+                                  fontSize: 17,
+                                  fontWeight: FontWeight.w700)),
+                          const SizedBox(height: 6),
+                          Text(
+                              q.isNotEmpty
+                                  ? 'Coba kata lain atau kategori lain.'
+                                  : isOwnerNow
+                                      ? 'Tambah menu pertama biar bisa jualan.'
+                                      : 'Minta owner tambah produk dulu.',
+                              textAlign: TextAlign.center,
+                              style: const TextStyle(
+                                  color: AppColors.mfg)),
+                          if (isOwnerNow &&
+                              q.isEmpty) ...[
+                            const SizedBox(height: 16),
+                            FilledButton.icon(
+                              onPressed: () =>
+                                  Navigator.pushNamed(context,
+                                      '/produk_baru'),
+                              icon: const Icon(Icons.add),
+                              label: const Text(
+                                  'Tambah Menu Pertama'),
+                            ),
+                          ],
+                        ]),
+                  ),
+                );
+              }
               return GridView.builder(
                 padding: const EdgeInsets.all(12),
                 gridDelegate:
@@ -112,51 +166,118 @@ class _K extends ConsumerState<KatalogScreen> {
                 itemCount: f.length,
                 itemBuilder: (_, i) {
                   final p = f[i];
+                  final out = p.stock <= 0;
                   return Card(
+                    clipBehavior: Clip.antiAlias,
+                    shape: RoundedRectangleBorder(
+                        borderRadius:
+                            BorderRadius.circular(16)),
                     child: InkWell(
                       // Tap = tambah cepat. Tahan = detail / edit.
-                      onTap: () {
-                        ref.read(cartProvider.notifier).add(p);
-                        ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                                content: Text('${p.name} +1'),
-                                duration:
-                                    const Duration(milliseconds: 600)));
-                      },
+                      onTap: out
+                          ? null
+                          : () {
+                              ref
+                                  .read(cartProvider.notifier)
+                                  .add(p);
+                              ScaffoldMessenger.of(context)
+                                  .showSnackBar(SnackBar(
+                                      content:
+                                          Text('${p.name} +1'),
+                                      duration: const Duration(
+                                          milliseconds:
+                                              600)));
+                            },
                       onLongPress: () => Navigator.pushNamed(
                           context, '/detail',
                           arguments: p.id),
-                      child: Padding(
-                        padding: const EdgeInsets.all(10),
-                        child: Column(
-                            crossAxisAlignment:
-                                CrossAxisAlignment.start,
-                            children: [
-                              Expanded(
-                                child: Container(
-                                  decoration: BoxDecoration(
-                                      color: AppColors.mut,
-                                      borderRadius:
-                                          BorderRadius.circular(10)),
-                                  child: const Center(
-                                      child: Icon(Icons.inventory_2,
-                                          color: AppColors.mfg)),
+                      child: Opacity(
+                        opacity: out ? 0.55 : 1,
+                        child: Padding(
+                          padding:
+                              const EdgeInsets.all(10),
+                          child: Column(
+                              crossAxisAlignment:
+                                  CrossAxisAlignment.start,
+                              children: [
+                                Expanded(
+                                  child: Stack(children: [
+                                    Container(
+                                      decoration:
+                                          BoxDecoration(
+                                              color: AppColors
+                                                  .mut,
+                                              borderRadius:
+                                                  BorderRadius.circular(
+                                                      12)),
+                                      child: const Center(
+                                          child: Icon(
+                                              Icons
+                                                  .coffee,
+                                              size: 40,
+                                              color: AppColors
+                                                  .pri)),
+                                    ),
+                                    if (out)
+                                      Positioned(
+                                        top: 6, left: 6,
+                                        child: Container(
+                                          padding:
+                                              const EdgeInsets.symmetric(
+                                                  horizontal:
+                                                      8,
+                                                  vertical:
+                                                      3),
+                                          decoration: BoxDecoration(
+                                              color:
+                                                  AppColors.dan,
+                                              borderRadius:
+                                                  BorderRadius.circular(
+                                                      8)),
+                                          child: const Text(
+                                              'HABIS',
+                                              style: TextStyle(
+                                                  fontSize:
+                                                      10,
+                                                  fontWeight:
+                                                      FontWeight
+                                                          .w700,
+                                                  color: Colors
+                                                      .white)),
+                                        ),
+                                      ),
+                                  ]),
                                 ),
-                              ),
-                              const SizedBox(height: 6),
-                              Text(p.name,
-                                  maxLines: 1,
-                                  style: const TextStyle(
-                                      fontWeight: FontWeight.w600)),
-                              Text(rp(p.price),
-                                  style: const TextStyle(
-                                      color: AppColors.pri,
-                                      fontWeight: FontWeight.w700)),
-                              Text('Stok ${p.stock}',
-                                  style: const TextStyle(
-                                      fontSize: 11,
-                                      color: AppColors.mfg)),
-                            ]),
+                                const SizedBox(height: 8),
+                                Text(p.name,
+                                    maxLines: 1,
+                                    overflow:
+                                        TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                        fontWeight:
+                                            FontWeight.w700,
+                                        fontSize: 14)),
+                                const SizedBox(height: 2),
+                                Text(rp(p.price),
+                                    style: const TextStyle(
+                                        color: AppColors.pri,
+                                        fontWeight:
+                                            FontWeight.w800,
+                                        fontSize: 15)),
+                                Text(
+                                    out
+                                        ? 'Stok habis'
+                                        : 'Stok ${p.stock}',
+                                    style: TextStyle(
+                                        fontSize: 11,
+                                        color: out
+                                            ? AppColors.dan
+                                            : AppColors.mfg,
+                                        fontWeight: out
+                                            ? FontWeight.w700
+                                            : FontWeight.w400)),
+                              ]),
+                        ),
                       ),
                     ),
                   );
@@ -203,7 +324,12 @@ class _K extends ConsumerState<KatalogScreen> {
             )
           : null,
       bottomNavigationBar: BottomNavigationBar(
+        type: BottomNavigationBarType.fixed,
         currentIndex: 0,
+        selectedItemColor: AppColors.pri,
+        unselectedItemColor: AppColors.mfg,
+        selectedFontSize: 11,
+        unselectedFontSize: 11,
         onTap: (i) {
           if (i == 1) {
             Navigator.pushNamed(context, '/keranjang');
