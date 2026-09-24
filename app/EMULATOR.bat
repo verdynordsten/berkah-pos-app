@@ -21,5 +21,7 @@ if errorlevel 1 (
 echo Nyalain emulator: %AVD%
 echo Jendela ini JANGAN ditutup selama ngoding. Minimize aja.
 echo.
-emulator -avd %AVD% -netdelay none -netspeed full
+REM PENTING: pakai emulator.exe (dengan .exe!) — kalau cuma "emulator",
+REM Windows malah manggil file .bat ini sendiri -> looping ngespam.
+emulator.exe -avd %AVD% -netdelay none -netspeed full
 pause
