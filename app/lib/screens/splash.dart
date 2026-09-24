@@ -71,8 +71,13 @@ class _S extends ConsumerState<SplashScreen> {
           const Text('v1.0.0',
               style: TextStyle(fontSize: 12, color: Colors.white70)),
           const SizedBox(height: 40),
-          const Text('Memuat...',
-              style: TextStyle(fontSize: 12, color: Colors.white70)),
+          const SizedBox(
+            width: 28, height: 28,
+            child: CircularProgressIndicator(
+                strokeWidth: 3,
+                valueColor:
+                    AlwaysStoppedAnimation(Colors.white)),
+          ),
         ]),
       ),
     );

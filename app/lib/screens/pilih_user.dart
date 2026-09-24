@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/store.dart';
 import '../core/theme.dart';
 import 'kasir_setup.dart' show hashPin, hashOwnerPin;
-import 'shift.dart' show shiftProvider;
+
 
 // 02b Pilih Pengguna — setelah login owner/admin (email), pilih mau
 // jualan sebagai siapa: Owner, Admin, atau Kasir.

@@ -28,8 +28,11 @@ class CartLine {
 
 class Cart extends StateNotifier<List<CartLine>> {
   Cart() : super([]);
-  void add(Product p) {
+  /// Tambah 1 pcs. Return false kalau stok tidak cukup (batas = p.stock).
+  bool add(Product p) {
     final i = state.indexWhere((e) => e.product.id == p.id);
+    final cur = i < 0 ? 0 : state[i].qty;
+    if (cur + 1 > p.stock) return false;
     if (i < 0) {
       state = [...state, CartLine(p, 1)];
     } else {
@@ -37,6 +40,7 @@ class Cart extends StateNotifier<List<CartLine>> {
       c[i].qty++;
       state = c;
     }
+    return true;
   }
   void dec(Product p) {
     final i = state.indexWhere((e) => e.product.id == p.id);
@@ -83,9 +87,24 @@ class PosSession {
 }
 
 class SessionCtl extends StateNotifier<PosSession?> {
-  SessionCtl() : super(null);
-  void set(PosSession s) => state = s;
-  void clear() => state = null;
+  SessionCtl(this._ref) : super(null);
+  // ignore: unused_field
+  final Ref _ref;
+  void set(PosSession s) {
+    // Ganti toko/user = keranjang lama dibuang (produk toko lain
+    // tidak boleh kebawa checkout ke toko baru).
+    _ref.read(cartProvider.notifier).clear();
+    _ref.read(customerProvider.notifier).state = null;
+    state = s;
+  }
+
+  void clear() {
+    _ref.read(cartProvider.notifier).clear();
+    try {
+      _ref.read(customerProvider.notifier).state = null;
+    } catch (_) {}
+    state = null;
+  }
 }
 
 /// Pulihkan sesi owner dari Supabase Auth yang masih tersimpan di device.
@@ -110,7 +129,15 @@ Future<PosSession?> restoreOwnerSession(SupabaseClient db) async {
     role: (mem['role'] as String?) ?? 'staff');
 }
 
-final sessionProvider = StateNotifierProvider<SessionCtl, PosSession?>((ref) => SessionCtl());
+final sessionProvider = StateNotifierProvider<SessionCtl, PosSession?>((ref) => SessionCtl(ref));
+
+/// Provider global (dulu di shift.dart / pelanggan.dart, dipindah ke sini
+/// biar SessionCtl bisa reset keduanya saat ganti sesi tanpa circular import).
+/// Shift aktif — id dipakai saat simpan transaksi.
+final shiftProvider = StateProvider<Map<String, dynamic>?>((_) => null);
+
+/// Pelanggan terpilih — dipakai checkout (customer_id transaksi).
+final customerProvider = StateProvider<Map<String, dynamic>?>((_) => null);
 
 final productsProvider = FutureProvider<List<Product>>((ref) async {
   final db = ref.watch(supabaseProvider);

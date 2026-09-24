@@ -5,8 +5,9 @@ import 'package:qr_flutter/qr_flutter.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../core/store.dart';
 import '../core/theme.dart';
-import 'pelanggan.dart' show customerProvider;
-import 'shift.dart' show shiftProvider;
+import '../core/loading.dart';
+
+
 
 // 10 Bayar QRIS — QR + countdown real 5 menit + simpan transaksi saat konfirmasi.
 class BayarQrisScreen extends ConsumerStatefulWidget {
@@ -148,10 +149,32 @@ class _Q extends ConsumerState<BayarQrisScreen> {
             child: Text('Scan kode di atas dengan e-wallet / m-banking',
                 style: TextStyle(color: AppColors.mfg))),
         Center(
-            child: Text(expired ? 'Kedaluwarsa' : 'Berlaku $_clock',
-                style: TextStyle(
-                    color: expired ? AppColors.dan : AppColors.warn,
-                    fontWeight: FontWeight.w700))),
+            child: expired
+                ? const Text('Kedaluwarsa',
+                    style: TextStyle(
+                        color: AppColors.dan,
+                        fontWeight: FontWeight.w700))
+                : Column(children: [
+                    Text('Berlaku $_clock',
+                        style: const TextStyle(
+                            color: AppColors.mfg,
+                            fontWeight: FontWeight.w700)),
+                    const SizedBox(height: 8),
+                    SizedBox(
+                      width: 220,
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: LinearProgressIndicator(
+                          value: _left / 300,
+                          minHeight: 6,
+                          backgroundColor: AppColors.mut,
+                          valueColor:
+                              const AlwaysStoppedAnimation(
+                                  AppColors.warn),
+                        ),
+                      ),
+                    ),
+                  ])),
         const SizedBox(height: 12),
         Container(
           padding: const EdgeInsets.all(14),
@@ -167,8 +190,9 @@ class _Q extends ConsumerState<BayarQrisScreen> {
             onPressed: expired || _saving
                 ? null
                 : () => _confirm(total),
-            child: Text(
-                _saving ? 'Menyimpan...' : 'Saya Sudah Bayar')),
+            child: _saving
+                ? const BusyLabel('Menyimpan')
+                : const Text('Saya Sudah Bayar')),
       ]),
     );
   }

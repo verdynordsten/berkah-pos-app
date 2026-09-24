@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/store.dart';
 import '../core/theme.dart';
+import '../core/loading.dart';
 
 // 03a Setup Toko (owner) — 2 mode:
 //  A. Punya session (normal): edit nama/alamat/telp/pajak. Simpan -> /kasir.
@@ -192,7 +193,7 @@ class _T extends ConsumerState<TokoSetupScreen> {
         const SizedBox(height: 16),
         FilledButton(
             onPressed: _busy ? null : _save,
-            child: Text(_busy ? 'Menyimpan...' : 'Simpan & Lanjut')),
+            child: _busy ? const BusyLabel('Menyimpan') : const Text('Simpan & Lanjut')),
       ]),
     );
   }
@@ -285,7 +286,7 @@ class _BTF extends ConsumerState<_BuatTokoForm> {
         const SizedBox(height: 16),
         FilledButton(
             onPressed: _busy ? null : _go,
-            child: Text(_busy ? 'Membuat...' : 'Buat Toko & Masuk')),
+            child: _busy ? const BusyLabel('Membuat') : const Text('Buat Toko & Masuk')),
       ]),
     );
   }

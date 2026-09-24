@@ -173,17 +173,18 @@ class _K extends ConsumerState<KatalogScreen> {
                         borderRadius:
                             BorderRadius.circular(16)),
                     child: InkWell(
-                      // Tap = tambah cepat. Tahan = detail / edit.
+                      // Tap = tambah cepat (dibatasi stok). Tahan = detail / edit.
                       onTap: out
                           ? null
                           : () {
-                              ref
+                              final ok = ref
                                   .read(cartProvider.notifier)
                                   .add(p);
                               ScaffoldMessenger.of(context)
                                   .showSnackBar(SnackBar(
-                                      content:
-                                          Text('${p.name} +1'),
+                                      content: Text(ok
+                                          ? '${p.name} +1'
+                                          : 'Stok ${p.name} cuma ${p.stock}'),
                                       duration: const Duration(
                                           milliseconds:
                                               600)));

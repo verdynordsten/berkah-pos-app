@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../core/store.dart';
 import 'kasir_setup.dart' show hashOwnerPin;
+import '../core/loading.dart';
 
 // 02a Register — daftar owner + bikin toko + PASANG PIN OWNER dalam 1 langkah.
 // Flow: signUp -> create_store_with_owner (RPC) -> simpan pin_hash owner
@@ -117,7 +118,7 @@ class _R extends ConsumerState<RegisterScreen> {
         const SizedBox(height: 16),
         FilledButton(
             onPressed: _busy ? null : _go,
-            child: Text(_busy ? 'Mendaftar...' : 'Daftar & Buat Toko')),
+            child: _busy ? const BusyLabel('Mendaftar') : const Text('Daftar & Buat Toko')),
         TextButton(
             onPressed: () =>
                 Navigator.pushReplacementNamed(context, '/login'),

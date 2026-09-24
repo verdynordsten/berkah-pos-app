@@ -2,9 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../core/theme.dart';
+import '../core/loading.dart';
 import '../core/store.dart';
-import 'shift.dart' show shiftProvider;
-import 'pelanggan.dart' show customerProvider;
+
+
 
 // 09 Bayar Tunai — metode + denom + kembalian + simpan ke Supabase
 class BayarTunaiScreen extends ConsumerStatefulWidget {
@@ -133,8 +134,9 @@ class _B extends ConsumerState<BayarTunaiScreen> {
                       if (mounted) setState(() => saving = false);
                     }
                   },
-            child: Text(
-                saving ? 'Menyimpan...' : 'Selesaikan Transaksi')),
+            child: saving
+                ? const BusyLabel('Menyimpan')
+                : const Text('Selesaikan Transaksi')),
       ]),
     );
   }

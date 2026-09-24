@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../core/store.dart';
 import '../core/theme.dart';
+import '../core/loading.dart';
 
 // 02 Login — 1 pintu: email + password owner (Supabase Auth).
 // Sukses -> /pilih (pilih mau jualan sebagai Owner/Admin/Kasir).
@@ -111,7 +112,7 @@ class _L extends ConsumerState<LoginScreen> {
         const SizedBox(height: 12),
         FilledButton(
             onPressed: _busy ? null : _loginOwner,
-            child: Text(_busy ? 'Masuk...' : 'Masuk')),
+            child: _busy ? const BusyLabel('Masuk') : const Text('Masuk')),
         TextButton(
             onPressed: () =>
                 Navigator.pushReplacementNamed(context, '/register'),

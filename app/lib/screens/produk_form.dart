@@ -5,6 +5,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../core/store.dart';
 import '../core/theme.dart';
+import '../core/loading.dart';
 
 // 05b Tambah/Edit Produk (owner/admin) — nama + KATEGORI PER-TOKO
 // (tambah/edit/hapus langsung dari form, bebas sebanyak apa pun) +
@@ -466,7 +467,7 @@ class _PF extends ConsumerState<ProdukFormScreen> {
           const SizedBox(height: 8),
           const LinearProgressIndicator(),
           const SizedBox(height: 4),
-          const Text('Mengupload foto...',
+          const Text('Mengupload foto',
               style: TextStyle(fontSize: 12, color: AppColors.mfg)),
         ],
         if (_foto != null || _fotoUrlLama?.isNotEmpty == true) ...[
@@ -556,7 +557,7 @@ class _PF extends ConsumerState<ProdukFormScreen> {
         const SizedBox(height: 16),
         FilledButton(
             onPressed: (_busy || _uploading) ? null : _save,
-            child: Text(_busy ? 'Menyimpan...' : 'Simpan Produk')),
+            child: _busy ? const BusyLabel('Menyimpan') : const Text('Simpan Produk')),
       ]),
     );
   }

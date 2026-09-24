@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/store.dart';
 import '../core/theme.dart';
-import 'shift.dart' show shiftProvider;
+
 import 'kasir_setup.dart' show hashPin, hashOwnerPin;
 
 // 13 Lainnya — menu owner/kasir: ganti PIN, kelola kasir, setup toko,

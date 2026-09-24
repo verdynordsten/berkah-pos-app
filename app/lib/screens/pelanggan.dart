@@ -3,10 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/store.dart';
 import '../core/theme.dart';
 
-// Pelanggan terpilih — dipakai checkout (customer_id transaksi).
-final customerProvider =
-    StateProvider<Map<String, dynamic>?>((_) => null);
-
+// NOTE: customerProvider pindah ke core/store.dart (dipakai SessionCtl reset).
 // 08 Pelanggan — list real dari DB + search + tambah + pilih/skip.
 class PelangganScreen extends ConsumerStatefulWidget {
   const PelangganScreen({super.key});

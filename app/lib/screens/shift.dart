@@ -2,10 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/store.dart';
 import '../core/theme.dart';
+import '../core/loading.dart';
 
 // 04 Pilih Shift — buka shift REAL: insert ke shifts (store+kasir+modal).
 // Selesai -> /katalog. Shift id disimpan di provider untuk dipakai checkout.
-final shiftProvider = StateProvider<Map<String, dynamic>?>((_) => null);
+// NOTE: shiftProvider pindah ke core/store.dart (dipakai SessionCtl reset).
 
 class ShiftScreen extends ConsumerStatefulWidget {
   const ShiftScreen({super.key});
@@ -92,7 +93,7 @@ class _Sh extends ConsumerState<ShiftScreen> {
         const SizedBox(height: 16),
         FilledButton(
             onPressed: busy ? null : _start,
-            child: Text(busy ? 'Membuka...' : 'Mulai Shift')),
+            child: busy ? const BusyLabel('Membuka') : const Text('Mulai Shift')),
       ]),
     );
   }

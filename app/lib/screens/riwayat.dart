@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/store.dart';
 import '../core/theme.dart';
+import '../core/loading.dart';
 
 // 12 Riwayat Transaksi — list transaksi toko aktif (terbaru dulu).
 // Tap item -> detail item + total.
@@ -65,7 +66,13 @@ class RiwayatScreen extends ConsumerWidget {
                                 color: AppColors.pri)),
                         onTap: () => showDialog(
                           context: context,
-                          builder: (_) => _DetailTrx(id: t['id'] as String),
+                          builder: (_) => _DetailTrx(
+                              id: t['id'] as String,
+                              code:
+                                  '${t['code']} — ${t['pay_method']}',
+                              payMethod:
+                                  (t['pay_method'] ?? '').toString(),
+                              total: (t['total'] as num?) ?? 0),
                         ),
                       ),
                     );
@@ -79,23 +86,35 @@ class RiwayatScreen extends ConsumerWidget {
 
 class _DetailTrx extends ConsumerWidget {
   final String id;
-  const _DetailTrx({required this.id});
+  final String code;
+  final String payMethod;
+  final num total;
+  const _DetailTrx(
+      {required this.id,
+      this.code = '',
+      this.payMethod = '',
+      this.total = 0});
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return AlertDialog(
-      title: const Text('Detail Transaksi'),
+      title: Text(code.isEmpty ? 'Detail Transaksi' : code),
       content: FutureBuilder(
         future: ref.watch(supabaseProvider)
             .from('transaction_items')
             .select()
             .eq('transaction_id', id),
         builder: (_, snap) {
-          if (!snap.hasData) {
+          if (snap.connectionState == ConnectionState.waiting) {
             return const SizedBox(
-                height: 60,
-                child: Center(child: CircularProgressIndicator()));
+                height: 80, child: AppLoader(label: 'Memuat item'));
+          }
+          if (snap.hasError) {
+            return Text('Gagal: ${snap.error}');
           }
           final items = (snap.data as List?) ?? [];
+          if (items.isEmpty) {
+            return const Text('Tidak ada item.');
+          }
           return SizedBox(
             width: double.maxFinite,
             child: Column(
@@ -119,6 +138,18 @@ class _DetailTrx extends ConsumerWidget {
                           ]),
                     );
                   }),
+                  const Divider(),
+                  Row(
+                      mainAxisAlignment:
+                          MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(payMethod,
+                            style: const TextStyle(
+                                color: AppColors.mfg)),
+                        Text(rp(total),
+                            style: const TextStyle(
+                                fontWeight: FontWeight.w700)),
+                      ]),
                 ]),
           );
         },
